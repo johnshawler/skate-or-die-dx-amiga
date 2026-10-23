@@ -16,4 +16,5 @@ See `demo/README.txt` (what runs, controls, specs) and `docs/TRANSLATOR.md`, `do
     # FPS overlay / unpaced speed test:  EXTRA="-DFPS_ON -DEV_UNPACED" ./build.sh
     cd tools && CPU=68020 EVKEY=F3 BOOT_WAIT=30 ./uae_run_event.sh ../demo/build/OverworldDemo OUT_DIR ../roms/"Kickstart v3.1 r40.068 (1993-12)(Commodore)(A1200)[!].rom"
 Needs fs-uae, Xvfb, xdotool, ImageMagick, amitools (rdbtool/xdftool) for the emulator tests.
+Make the HDF: `tools/mkhdf.sh` (after build.sh).
 Lockstep checks: `tools/t816/lockstep_batch.sh`, `nativetest.py`, `cov_union.py` (see docs/TRANSLATOR.md).
