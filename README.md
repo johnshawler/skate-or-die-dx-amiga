@@ -8,6 +8,7 @@ See `demo/README.txt` (what runs, controls, specs) and `docs/TRANSLATOR.md`, `do
 - `demo/` Amiga source (`src/`), `build.sh` (needs `m68k-linux-gnu-gcc`), assets.
 - `work/` extracted game data used by the tools.
 - `roms/` Kickstart 3.1 (A1200, r40.068) used by the FS-UAE test scripts. Private repo only: the ROM is copyrighted.
+- `roms/Kickstart 1.3 ... (Guardian 1.2 patched).rom` 256 KB, SHA-256 e8a1cd19...54bb2: Kickstart 1.3 (exec 34.2) with the third-party Guardian 1.2 utility built in, so not a pristine ROM. OCS/68000 only (A500-class): it cannot run the AGA demo, only useful for OCS-era emulation tests.
 - `sod_demo.fs-uae` FS-UAE config for the HDF.
 
 ## Build and run
