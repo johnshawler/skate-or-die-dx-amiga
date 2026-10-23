@@ -35,6 +35,10 @@ typedef struct { int jx, jy, b0, b1, n; } HxSeg;
 static HxSeg hx_seg[20000]; static int hx_nseg;
 static int hx_blk_frame[256], hx_blk_first[256], hx_nblk, hx_cur_blk = -1, hx_cur_seg = -1, hx_seg_left;
 static unsigned hx_poll_total;
+static word32 hx_pc[4]; static int hx_npc; static unsigned hx_pc_hits[4];
+void set_bp(word32 addr, word32 end_addr, word32 acc_type);
+int hx_is_pc(word32 a) { int i; for(i = 0; i < hx_npc; i++) if(hx_pc[i] == (a & 0xffffff)) return 1; return 0; }
+void hx_pc_hit(word32 a) { int i; for(i = 0; i < hx_npc; i++) if(hx_pc[i] == (a & 0xffffff)) hx_pc_hits[i]++; }
 static FILE *hx_csv, *hx_wcsv;
 static char hx_dir[512];
 static long hx_frames, hx_shot_every, hx_shot_from;
@@ -62,7 +66,7 @@ void hx_init(void)
 	hx_shot_from = (t = getenv("HX_SHOT_FROM")) ? atol(t) : 0;
 	snprintf(path, sizeof(path), "%s/frames.csv", o);
 	hx_csv = fopen(path, "w");
-	fprintf(hx_csv, "frame,vbl_cycles_1mhz,pad_polls,key_events,doc_writes,shr_changed_bytes,shr_hash,c029,poll_total\n");
+	fprintf(hx_csv, "frame,vbl_cycles_1mhz,pad_polls,key_events,doc_writes,shr_changed_bytes,shr_hash,c029,poll_total,pc0,pc1\n");
 	if(s) {
 		FILE *f = fopen(s, "r"); int n = 0;
 		hx_ev = (HxEv *)calloc(20000, sizeof(HxEv));
@@ -77,6 +81,10 @@ void hx_init(void)
 			if(n < 20000) hx_ev[n++] = e;
 		}
 		hx_nev = n; if(f) fclose(f);
+	}
+	if((t = getenv("HX_PCHOOK"))) {          /* HX_PCHOOK=031082,... : count executions of these 65816 addresses (the games' main-loop pass hooks) */
+		char *p = strdup(t), *tok = strtok(p, ",");
+		while(tok && hx_npc < 4) { hx_pc[hx_npc] = (word32)strtoul(tok, NULL, 16); set_bp(hx_pc[hx_npc], hx_pc[hx_npc], 4); hx_npc++; tok = strtok(NULL, ","); }
 	}
 	if(w) {
 		char *p = strdup(w), *tok = strtok(p, ",");
@@ -124,8 +132,8 @@ void hx_frame_end(void)
 	char path[600];
 	for(i = 0; i < 0x8000; i++) { h = (h ^ scr[i]) * 16777619u; if(scr[i] != hx_prev[i]) changed++; }
 	memcpy(hx_prev, scr, 0x8000);
-	fprintf(hx_csv, "%u,%llu,%u,%u,%u,%d,%08x,%02x,%u\n", g_vbl_count, (unsigned long long)(g_last_vbl_dfcyc >> 16), hx_pad_triggers, hx_key_events, hx_doc_writes, changed, h, (unsigned)(((g_cur_a2_stat & 0xa0) | g_c029_val_some) & 0xff), hx_poll_total);
-	hx_pad_triggers = 0; hx_doc_writes = 0; hx_key_events = 0;
+	fprintf(hx_csv, "%u,%llu,%u,%u,%u,%d,%08x,%02x,%u,%u,%u\n", g_vbl_count, (unsigned long long)(g_last_vbl_dfcyc >> 16), hx_pad_triggers, hx_key_events, hx_doc_writes, changed, h, (unsigned)(((g_cur_a2_stat & 0xa0) | g_c029_val_some) & 0xff), hx_poll_total, hx_pc_hits[0], hx_pc_hits[1]);
+	hx_pc_hits[0] = hx_pc_hits[1] = 0; hx_pad_triggers = 0; hx_doc_writes = 0; hx_key_events = 0;
 	if(hx_shot_every && (long)g_vbl_count >= hx_shot_from && (g_vbl_count % hx_shot_every) == 0) {
 		FILE *f; snprintf(path, sizeof(path), "%s/shr_%06u.bin", hx_dir, g_vbl_count);
 		f = fopen(path, "wb"); if(f) { fwrite(scr, 1, 0x8000, f); fclose(f); }

@@ -27,5 +27,8 @@ m = re.search(r'void\ndoc_write_c03d\(dword64 dfcyc, word32 val\)\n\{\n', s)
 assert m
 s = s[:m.start()] + 'extern unsigned hx_doc_writes;\n' + s[m.start():m.end()] + '\thx_doc_writes++;\n' + s[m.end():]
 open(f'{d}/doc.c', 'w').write(s)
+# debugger.c: instruction breakpoints set by the harness only count, they do not stop the machine
+edit('debugger.c', '\t\tif((type & bp_ptr->acc_type) == 0) {\n\t\t\tcontinue;\n\t\t}\n', '\t\tif((type & bp_ptr->acc_type) == 0) {\n\t\t\tcontinue;\n\t\t}\n\t\tif(hx_active && type == 4 && hx_is_pc(addr)) { hx_pc_hit(addr); continue; }\n')
+edit('debugger.c', 'void\ncheck_breakpoints(word32 addr,', 'extern int hx_active; int hx_is_pc(word32); void hx_pc_hit(word32);\nvoid\ncheck_breakpoints(word32 addr,')
 # vars: link harness.o
 edit('vars_x86linux', 'OBJECTS1 = pulseaudio_driver.o xdriver.o', 'OBJECTS1 = pulseaudio_driver.o xdriver.o harness.o')
