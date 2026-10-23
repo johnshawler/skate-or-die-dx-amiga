@@ -11,9 +11,9 @@ CPU clocks per PAL second: 7,093,790; assumed 90% available (refresh, audio, dis
 | High Jump | 26.7 /s | 239 k | 55 k / 104 k | 407 k / 714 k | **1.70x over** |
 | Downhill Race | 11.1 /s | 575 k | 54 k / 173 k | 604 k / 1.61 M | 1.05x over (max 2.8x) |
 | Downhill Jam | 9.8 /s | 651 k | 60 k / 240 k | 642 k / 2.12 M | 0.99x (max 3.2x) |
-| Pool Joust | about 14 /s (30 in play) | 456 k (213 k in play) | not measured: the cost run stays on the opponent screen | - | unknown |
+| Pool Joust | about 14 /s (30 in play) | 456 k (213 k in play) | not measured: the cost run does not get past the opponent-selection screen (mean 175 k, max 4.8 M instructions there) | - | unknown |
 
-Without the native routines the translated code costs 220 k (ramp), 244 k (high jump), 2.5 M (race), 2.6 M (jam) instructions per pass, which is 6-45 times more. The natives use unaligned 16/32-bit accesses that a 68000 does not allow (address error); they would have to be rewritten.
+Without the native routines the translated code costs 220 k (ramp), 244 k (high jump), 2.5 M (race), 2.6 M (jam) instructions per pass, which is about 4-5 times more for ramp/jump and about 45 times more for the downhill events. The natives use unaligned 16/32-bit accesses that a 68000 does not allow (address error); they would have to be rewritten.
 
 ## 2. What is not in those numbers (and why they matter)
 * **Picture path.** The game draws into a chunky (two pixels per byte) picture in IIGS memory. Converting it to four bitplanes on a 68000 costs at least ~20 instructions x ~8 clocks per 8-pixel group; a full-screen scroll is 8,000 groups = ~1.3 M clocks (estimate), against 575 k available for a whole race pass. The race picture changes by up to 13.8 KB (43%) per pass, so even converting only changed groups costs several hundred thousand clocks. CPU conversion is not viable.
@@ -22,8 +22,14 @@ Without the native routines the translated code costs 220 k (ramp), 244 k (high 
 * Audio (NES music and effects through Paula; sample data is chip RAM), input, interrupts: small in CPU time (estimate under 3%), but samples cost memory (below).
 * Real 68000 timing is slower than the lower bound (indexed modes, shifts, branches): expect +25-40% (estimate).
 
-## 3. Proposed allocation per pass (race, at 575 k clocks; estimate, does not close)
-translated game logic ~150 k (measured instructions x ~3 clocks of internal overhead are not included), sprite/blit work 50 % blitter + ~60 k CPU set-up, scroll/picture ~blitter 54 ms + ~40 k CPU, audio/input/interrupts ~20 k, safety margin 20% = ~115 k. Sum with the lower bound exceeds the budget; **no allocation that meets the update contract has been found**.
+## 3. Allocation per pass (race, 575 k clocks available; estimate)
+| Subsystem | clocks | basis |
+|---|---|---|
+| translated game logic + sprite/fill routines | 604 k (lower bound, measured instruction stream) | section 1 |
+| picture path | blitter 54-72 ms of the 90 ms pass, plus CPU set-up | estimate, section 2 |
+| audio, input, interrupts | about 20 k | estimate |
+| safety margin (20%) | about 115 k | target |
+The first row alone already uses the whole pass, so **no allocation that meets the update contract has been found** for any event except possibly the jam in its average case.
 
 ## 4. Memory (1,048,576 bytes of Chip; no Fast)
 | Item | estimate |
