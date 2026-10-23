@@ -1,0 +1,80 @@
+{
+ "file": "../../work/res/F21.bin",
+ "base": 4096,
+ "bank": 3,
+ "entry": 4096,
+ "pass_hook": "0x1077",
+ "patched_jsr": {
+  "0x2EED": "0x2EEE"
+ },
+ "dispatch_table": {
+  "0x2EED": [
+   "0x594C",
+   20
+  ]
+ },
+ "patched_jmp": {
+  "0x4BC7": "0x4BC8"
+ },
+ "dispatch_targets": {
+  "0x4BC7": [
+   "0x1B86",
+   "0x1F71",
+   "0x1F99",
+   "0x2022",
+   "0x2134",
+   "0x213B",
+   "0x39D0",
+   "0x4BCB",
+   "0x4BED",
+   "0x4C44",
+   "0x4CD6",
+   "0x4D02",
+   "0x4D36",
+   "0x4D92",
+   "0x4DC6",
+   "0x4EAB",
+   "0x4ED1",
+   "0x4EE5",
+   "0x4EF1",
+   "0x4EFD",
+   "0x4F09",
+   "0x4F0F",
+   "0x4F1B",
+   "0x4F21",
+   "0x4F2D",
+   "0x4F33",
+   "0x4F39",
+   "0x4F50",
+   "0x4F67",
+   "0x4F7E",
+   "0x4F95",
+   "0x4FAC",
+   "0x4FD3",
+   "0x503A",
+   "0x5079",
+   "0x5126"
+  ]
+ },
+ "aux": true,
+ "dk_dynamic": [
+  "0x3B33"
+ ],
+ "native": {
+  "consts": "dh21_consts.h",
+  "header": "dh_engine.h",
+  "fast": {
+   "0x3B03": "nat_bgfill"
+  },
+  "mid": {
+   "0x4A04": [
+    "nat_dh21_blit",
+    "0x4A58"
+   ],
+   "0x4AD5": [
+    "nat_dh_restore",
+    "0x4B10"
+   ]
+  }
+ }
+}

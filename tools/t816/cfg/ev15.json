@@ -1,0 +1,82 @@
+{
+ "file": "../../work/res/F15.bin",
+ "base": 4096,
+ "bank": 3,
+ "entry": 4096,
+ "pass_hook": "0x1082",
+ "patched_jsr": {
+  "0x1C1B": "0x1C1C",
+  "0x1C2A": "0x1C2B",
+  "0x1C39": "0x1C3A"
+ },
+ "dispatch_table": {
+  "0x1C1B": [
+   "0x5264",
+   16
+  ],
+  "0x1C2A": [
+   "0x5284",
+   16
+  ],
+  "0x1C39": [
+   "0x5284",
+   16
+  ]
+ },
+ "patched_jmp": {
+  "0x46D4": "0x46D5"
+ },
+ "dispatch_targets": {
+  "0x46D4": [
+   "0x134A",
+   "0x1376",
+   "0x139B",
+   "0x1435",
+   "0x2612",
+   "0x46D7",
+   "0x46F6",
+   "0x4716",
+   "0x473F",
+   "0x475F",
+   "0x47B8",
+   "0x47D8",
+   "0x4866",
+   "0x48D7",
+   "0x490A",
+   "0x4A59",
+   "0x4A73",
+   "0x4A85",
+   "0x4A92",
+   "0x4A9E",
+   "0x4AAA",
+   "0x4AB0",
+   "0x4AB6",
+   "0x4ABC",
+   "0x4AC2",
+   "0x4AC8",
+   "0x4ACE",
+   "0x4AD4"
+  ]
+ },
+ "aux": true,
+ "dk_dynamic": [
+  "0x36A4"
+ ],
+ "native": {
+  "consts": "dh15_consts.h",
+  "header": "dh_engine.h",
+  "fast": {
+   "0x3674": "nat_bgfill"
+  },
+  "mid": {
+   "0x4581": [
+    "nat_dh15_blit",
+    "0x45C7"
+   ],
+   "0x4644": [
+    "nat_dh_restore",
+    "0x467F"
+   ]
+  }
+ }
+}
