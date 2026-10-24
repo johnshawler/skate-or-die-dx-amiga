@@ -26,8 +26,8 @@ All natives and generator changes were checked against the original machine code
 * Tried and dropped (measured slower or no gain): a 16-pixel-at-a-time conversion kernel (the loop no longer fits the 020's 256-byte instruction cache), 64-bit bitplane fetch, `-Os` (-25%), `-O3` (same), bank 3 pointer in a register (same).
 * Sampling profiler (`-DPROFILE_PC`, `tools/run_prof.sh`, `analyze_pf.py`) found the real costs; the machine is bound by Chip-RAM accesses and instruction fetches, not by instruction counts.
 
-## Audio check (headless; nobody has listened)
-Recorded the emulated Paula output (`AUDIO=1 tools/run_uae.sh ... rec:name:seconds`, `tools/audiocheck.py`): title, shop and all five event songs play continuously, no clipping (peak 0.20-0.25), no silent seconds, and the long-term spectrum of each recording correlates 0.95-0.99 with the data file it should be playing (right pitch, no dropouts). Whether the songs are the right songs for each event (mapping inferred, Joust's song by elimination) and how they sound is **not verified by ear**.
+## Audio check (measured headless; listened to by the user)
+Recorded the emulated Paula output (`AUDIO=1 tools/run_uae.sh ... rec:name:seconds`, `tools/audiocheck.py`): title, shop and all five event songs play continuously, no clipping (peak 0.20-0.25), no silent seconds, and the long-term spectrum of each recording correlates 0.95-0.99 with the data file it should be playing (right pitch, no dropouts). **Listened to by the user (2026-10-24): "the audio is great".** The song-to-event mapping itself was inferred (Joust's song by elimination) and was accepted on that listening.
 
 ## Corrections to earlier statements
 * The first paced builds counted only the frames they waited, so their real rate was lower than printed; my earlier "held 12/11" statements for race/jam in that build were wrong, and the HDFs delivered before this were slower than I said (that is why you saw the events running slowly). Pacing now uses the CIA clock and the numbers above are measured with it.
