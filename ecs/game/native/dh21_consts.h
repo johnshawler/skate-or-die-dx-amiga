@@ -8,3 +8,4 @@
 #define N_JY_SAVE 1
 
 #define N_JGLYPH 1
+#define N_BG_SCROLL 1    /* nat_bgfill reports the scroll to the platform (c2p.h, C2P_SCROLL) */

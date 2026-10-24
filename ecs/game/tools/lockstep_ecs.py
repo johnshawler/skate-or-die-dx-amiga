@@ -13,11 +13,24 @@ def build(cfgname, debug=True):
     cfg = analyze.load_cfg_fix(json.load(open(f'{G}/cfg/{cfgname}.json')))
     outc = f'/tmp/t816_{cfgname}.c'; lib = f'/tmp/lib{cfgname}{"_dbg" if debug else ""}.so'
     subprocess.check_call([sys.executable, f'{G}/tools/gen_ecs.py', f'{G}/cfg/{cfgname}.json', outc], stderr=subprocess.DEVNULL)
-    flags = ['-O1', '-shared', '-fPIC', f'-I{G}/runtime', f'-I{here}/runtime', f'-I{G}/native', f'-I{here}/native'] + (['-DT816_DEBUG'] if debug else []) + (['-DT816_FAST'] if os.environ.get('T816_FAST') else [])
-    subprocess.check_call(['gcc'] + flags + ['-o', lib, outc, f'{G}/runtime/m816rt.c'])
+    flags = ['-O1', '-shared', '-fPIC', f'-I{G}/runtime', f'-I{here}/runtime', f'-I{G}/native', f'-I{here}/native', f'-I{G}/src'] + (['-DT816_DEBUG'] if debug else []) + (['-DT816_FAST'] if os.environ.get('T816_FAST') else [])
+    srcs = [outc, f'{G}/runtime/m816rt.c'] + ([f'{G}/tools/c2p_host.c'] if cfgname in C2P_SCROLL_CFGS else [])
+    subprocess.check_call(['gcc'] + flags + ['-o', lib] + srcs)
     return cfg, lib
 
 BANKS = [0, 1, 2, 3, 4, 5, 7, 0xE0, 0xE1]
+C2P_SCROLL_CFGS = ('ev21',)       # events whose picture conversion works from the scroll (c2p.h, C2P_SCROLL): the planar picture is checked at every pass
+
+def c2p_reference(e1):
+    """the planar picture (4 planes of 40 bytes per row, rows of 160 bytes) of the 200 rows at E1:$2000"""
+    a = np.frombuffer(e1, dtype=np.uint8).reshape(200, 80, 2)           # 160 bytes a row, two pixels a byte
+    a = a.reshape(200, 160)
+    px = np.empty((200, 320), dtype=np.uint8); px[:, 0::2] = a >> 4; px[:, 1::2] = a & 15
+    out = np.zeros((200, 4, 40), dtype=np.uint8)
+    for pl in range(4):
+        bits = ((px >> pl) & 1).reshape(200, 40, 8)
+        out[:, pl, :] = np.packbits(bits, axis=2).reshape(200, 40)
+    return out.reshape(200, 160)
 
 class IOS(ctypes.Structure):
     _fields_ = [('key', ctypes.c_uint8), ('key_waiting', ctypes.c_uint8), ('anykey', ctypes.c_uint8), ('mods', ctypes.c_uint8), ('enabled', ctypes.c_uint8),
@@ -120,10 +133,24 @@ def run(cfgname, mode, passes, trace=False, script=None):
     apply_input(tio, script(0))
     CB = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_uint32)
     snap = [bytes(rt.rt_bank_ptr(0xE1).contents[0x2000:0x9D00])]
-    dirty_bad = [0]
+    dirty_bad = [0]; scroll_cfg = cfgname in C2P_SCROLL_CFGS; c2p_bad = [0, None]
+    if scroll_cfg:
+        rt.c2p_host_pass.restype = ctypes.POINTER(ctypes.c_uint8 * 32000); rt.c2p_host_init()
     def cb(pc):
         cnt[0] += 1
         cur = bytes(rt.rt_bank_ptr(0xE1).contents[0x2000:0x9D00]); dmin = rt.rt_dmin_ptr().contents; dmax = rt.rt_dmax_ptr().contents
+        if scroll_cfg:       # the platform's planar picture (spans, scroll shifts) against a conversion of the whole picture
+            got = np.frombuffer(bytes(rt.c2p_host_pass().contents), dtype=np.uint8).reshape(200, 160)
+            bad = np.nonzero((got != c2p_reference(cur)).any(axis=1))[0]
+            if len(bad):
+                c2p_bad[0] += 1
+                if c2p_bad[1] is None: c2p_bad[1] = (cnt[0], bad[:8].tolist())
+            dirty_bad[0] += 0; snap[0] = cur
+            thash.append((rt.rt_get_wr_hash(), rt.rt_get_wr_n()))
+            if FAST: tstate.append((zlib.crc32(b''.join(bytes(rt.rt_bank_ptr(b).contents) for b in BANKS)), cp.a, cp.x, cp.y, cp.s, (cp.n << 7) | (cp.v << 6) | (cp.z << 1) | cp.c))
+            if cnt[0] > passes: return 1
+            apply_input(tio, script(cnt[0]))
+            return 0
         for row in range(200):
             a, b = cur[row*160:row*160+160], snap[0][row*160:row*160+160]
             if a != b:
@@ -184,7 +211,8 @@ def run(cfgname, mode, passes, trace=False, script=None):
             k = ne[0]
             print('first differing write #%d: oracle pc=%06x addr=%06x val=%02x | translated pc=%06x addr=%06x val=%02x' % (k, owl[k][0], owl[k][1] >> 8, owl[k][1] & 255, twl[k][0], twl[k][1] >> 8, twl[k][1] & 255))
             for j in range(max(0, k - 3), k): print('   before: pc=%06x addr=%06x val=%02x' % (owl[j][0], owl[j][1] >> 8, owl[j][1] & 255))
-    if cnt[0]: print('pixels changed outside the marked span: %d' % dirty_bad[0]); ok = ok and dirty_bad[0] == 0
+    if scroll_cfg: print('passes whose planar picture differs from a conversion of the whole picture: %d%s' % (c2p_bad[0], '' if c2p_bad[1] is None else ' (first: pass %d, rows %s)' % c2p_bad[1])); ok = ok and c2p_bad[0] == 0
+    elif cnt[0]: print('pixels changed outside the marked span: %d' % dirty_bad[0]); ok = ok and dirty_bad[0] == 0
     print('RESULT:', 'identical' if ok else 'DIFFERENT')
     return ok
 

@@ -9,14 +9,55 @@
  * page register to each destination page and stores every word with a direct-page store, in 21 passes of 8 rows of 160 bytes; the net
  * effect (checked on the instruction sequence) is one contiguous copy of $6900 bytes from bank 2 at the offset in N_BGSRC to bank 1 at
  * $3400-$9CFF, with shadowing on, so the hardware mirrors it into bank E1. */
+#ifdef N_BG_SCROLL
+/* The jam (c2p.h, C2P_SCROLL): when the window moves by whole rows, a row of the new picture is compared with the row of the old picture (still in bank E1) that has scrolled to its
+ * place, and only the groups that differ are marked as changed; the platform moves its planar picture by the scroll (rt_scroll). Without a scroll the old and the new row are compared
+ * in place, and only rows that differ are written. Anything else (the first fill, a jump of the offset) fills and marks the whole window as before. */
+extern u32 rt_bg_prev;
+extern void rt_scroll(int dy);
+#define BG_ROWS 168
+static int bg_fill_scroll(u16 y0)
+{
+    u32 prev = rt_bg_prev;
+    int dy, r;
+    const u32 *nw = (const u32 *)(B2 + y0);
+    u32 *e = (u32 *)(BE1 + 0x3400), *b1 = (u32 *)(B1 + 0x3400);
+    if (prev == 0xFFFFFFFFUL || y0 < prev || (u32)(y0 - prev) > 8UL * 160 || (y0 - prev) % 160) return 0;
+    dy = (int)((y0 - prev) / 160);
+    if (dy) rt_scroll(dy);
+    for (r = 0; r < BG_ROWS; r++) {
+        const u32 *n = nw + 40 * r;
+        int lo = 0, hi = 39, write = 1;
+        if (r + dy < BG_ROWS) {
+            const u32 *o = e + 40 * (r + dy);
+            while (lo < 40 && n[lo] == o[lo]) lo++;
+            if (lo == 40) { hi = -1; write = dy != 0; }
+            else while (n[hi] == o[hi]) hi--;
+        }
+        if (lo <= hi) mark_row_(32 + r, (u32)lo, (u32)hi);
+        if (write) copy2_bytes((u8 *)(b1 + 40 * r), (u8 *)(e + 40 * r), (const u8 *)n, 160);
+    }
+    return 1;
+}
+#endif
+
 static int nat_bgfill(void)
 {
     u16 dold = cpu.d, y0 = G3(N_BGSRC), s0 = cpu.s, A, Y;
     u8 dbold = cpu.db;
+#ifdef N_BG_SCROLL
+    if (io.ramrd || io.ramwrt || (u32)y0 + 0x6900UL > 0xFFF0) { rt_bg_prev = 0xFFFFFFFFUL; return 0; }
+#else
     if (io.ramrd || io.ramwrt || (u32)y0 + 0x6900UL > 0xFFF0) return 0;
+#endif
     BE0[0xC035] = (u8)(BE0[0xC035] & 0xF7);
+#ifdef N_BG_SCROLL
+    if (!bg_fill_scroll(y0)) { copy2_bytes(B1 + 0x3400, BE1 + 0x3400, B2 + y0, 0x6900); MARKE1_RANGE(0x3400, 0x6900); }
+    rt_bg_prev = y0;
+#else
     copy2_bytes(B1 + 0x3400, BE1 + 0x3400, B2 + y0, 0x6900);
     MARKE1_RANGE(0x3400, 0x6900);
+#endif
     BE0[0xC002] = BE0[0xC003] = BE0[0xC004] = BE0[0xC005] = 0xFF;      /* the writes that switch the auxiliary bank on and off */
     io.ramrd = io.ramwrt = 0;
     B0[s0] = dbold; B0[(u16)(s0 - 1)] = (u8)(dold >> 8); B0[(u16)(s0 - 2)] = (u8)dold;      /* PHB and PHD leave their bytes in the stack page */

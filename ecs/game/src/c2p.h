@@ -11,6 +11,12 @@
 #if !defined(C2P_BIGLUT) && !defined(C2P_SMALLLUT) && defined(EV_MODE) && (EV_MODE == 3 || EV_MODE == 5)
 #define C2P_BIGLUT
 #endif
+/* The jam (and only the jam so far) scrolls a 168-row window of the picture ($3400-$9CFF, rows 32-199) by whole rows. Its background copy (native.h nat_bgfill) then finds the
+   changed groups by comparing with the old picture shifted by the scroll and reports the scroll (rt_scroll): the planar picture is shifted instead of converted again, and only the changed groups are
+   converted, with no shadow copy to compare with. */
+#if !defined(C2P_SCROLL) && ((defined(EV_MODE) && EV_MODE == 4) || defined(C2P_SCROLL_HOST))
+#define C2P_SCROLL
+#endif
 #ifdef C2P_BIGLUT
 /* One table of 65536 longs: for two source bytes (four pixels) the plane bytes (plane 0 in the top byte) with the four pixels' bits in the upper nibble of
    each plane byte. A group of 8 pixels is lut[first two bytes] | (lut[next two bytes] >> 4). 256 KB of Chip RAM. */
@@ -43,12 +49,19 @@ static void c2p_build_lut(u32 *t)
 
 static u8 c2p_pmin[2][200], c2p_pmax[2][200];
 static u8 *c2p_shadow[2]; static u8 c2p_force[2] = { 1, 1 };
+#ifdef C2P_SCROLL
+u32 rt_bg_prev = 0xFFFFFFFFUL;                     /* the scroll offset the picture window was last filled from (all ones: not known) */
+static u16 c2p_acc[2];                             /* the rows the window has scrolled since each buffer was converted */
+#endif
 
 static void c2p_all_dirty(void)
 {
     int i;
     c2p_force[0] = c2p_force[1] = 1;
     for (i = 0; i < 200; i++) { c2p_pmin[0][i] = c2p_pmin[1][i] = 0; c2p_pmax[0][i] = c2p_pmax[1][i] = 39; }
+#ifdef C2P_SCROLL
+    c2p_acc[0] = c2p_acc[1] = 0; rt_bg_prev = 0xFFFFFFFFUL;
+#endif
 }
 
 /* move the game's changes into the pending spans of both buffers */
@@ -65,6 +78,40 @@ static void c2p_collect(void)
         if (hi > c2p_pmax[1][i]) c2p_pmax[1][i] = hi;
     }
 }
+
+#ifdef C2P_SCROLL
+/* the window ($3400-$9CFF, rows 32-199) of the picture has been scrolled up by dy rows (called by nat_bgfill before it fills the window): what was marked until now moves with the
+   picture, the rows that come in at the bottom are changed throughout, and both buffers remember the shift (c2p_convert moves their planar pictures when it gets to them) */
+void rt_scroll(int dy)
+{
+    int b, r;
+    if (dy <= 0) return;
+    c2p_collect();
+    for (b = 0; b < 2; b++) {
+        u8 *pmin = c2p_pmin[b], *pmax = c2p_pmax[b];
+        for (r = 32; r < 200 - dy; r++) { pmin[r] = pmin[r + dy]; pmax[r] = pmax[r + dy]; }
+        for (r = 200 - dy > 32 ? 200 - dy : 32; r < 200; r++) { pmin[r] = 0; pmax[r] = 39; }
+        c2p_acc[b] = (u16)(c2p_acc[b] + dy > 200 ? 200 : c2p_acc[b] + dy);
+    }
+}
+/* rows 32+acc..199 of a planar picture up to rows 32..199-acc */
+static void c2p_shift(u8 *dst, int acc)
+{
+    u32 n = (u32)(168 - acc) * 160;
+    u8 *d = dst + 32 * 160;
+    const u8 *s = d + (u32)acc * 160;
+    if (acc >= 168) return;
+#ifdef __mc68000__
+    __asm__ volatile(
+        "1: movem.l (%[s])+,%%d0-%%d7\n\t"
+        "movem.l %%d0-%%d7,(%[d])\n\tlea 32(%[d]),%[d]\n\t"
+        "subi.l #32,%[n]\n\tbne.s 1b"
+        : [s] "+a"(s), [d] "+a"(d), [n] "+d"(n) : : "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "memory", "cc");
+#else
+    { u32 i; for (i = 0; i < n; i++) d[i] = s[i]; }
+#endif
+}
+#endif
 
 #ifdef __mc68000__
 /* the plane bytes of one 8-pixel group (four chunky bytes in register `v`, destroyed) into register `r` (plane 0 in the top byte); %[i] is a data register whose
@@ -131,6 +178,24 @@ static void c2p_row_one(const u32 *tab, const u8 *s, u8 *d, u8 *h, int n, int fo
             : [t0] "a"(tab) : "memory", "cc");
     }
 }
+#ifdef C2P_SCROLL
+/* the groups of a row converted unconditionally, no shadow copy */
+static void c2p_row_ns(const u32 *tab, const u8 *s, u8 *d, int n)
+{
+    u32 t2, v, idx = 0;
+    n--;
+    __asm__ volatile(
+        "1: move.l (%[s])+,%[v]\n\t"
+        C2P_GROUP_D("%[v]", "%[a]")
+        "move.b %[a],120(%[d])\n\tlsr.l #8,%[a]\n\t"
+        "move.b %[a],80(%[d])\n\tlsr.l #8,%[a]\n\t"
+        "move.b %[a],40(%[d])\n\tlsr.l #8,%[a]\n\t"
+        "move.b %[a],(%[d])+\n\t"
+        "dbra %[n],1b"
+        : [s] "+a"(s), [d] "+a"(d), [n] "+d"(n), [i] "+d"(idx), [a] "=&d"(t2), [v] "=&d"(v)
+        : [t0] "a"(tab) : "memory", "cc");
+}
+#endif
 #ifdef C2P_PAIR
 /* (measured on the A1200 model: slower than one group at a time - the loop no longer fits the 68020's 256-byte instruction cache - so it is off) Two groups (16 pixels) at a time, writing a word to each plane instead of two bytes: the two lookups' plane bytes (a0 a1 a2 a3, b0 b1 b2 b3) are
    interleaved into the words a0b0 a1b1 a2b2 a3b3. The shadow copy sits at a constant distance from the picture, so it is addressed with an index register
@@ -191,6 +256,9 @@ static void c2p_convert(const u32 *tab, const u8 *src, u8 *dst, int buf)
 {
     u8 *pmin = c2p_pmin[buf], *pmax = c2p_pmax[buf];
     int y, force = c2p_force[buf];
+#ifdef C2P_SCROLL
+    if (c2p_acc[buf]) { c2p_shift(dst, c2p_acc[buf]); c2p_acc[buf] = 0; }
+#endif
     for (y = 0; y < 200; y++) {
         int g0 = pmin[y], g1 = pmax[y], n;
         const u8 *s;
@@ -203,7 +271,11 @@ static void c2p_convert(const u32 *tab, const u8 *src, u8 *dst, int buf)
         h = c2p_shadow[buf] + y * 160 + g0 * 4;
         n = g1 - g0 + 1;
 #ifdef __mc68000__
+#ifdef C2P_SCROLL
+        (void)h; (void)force; c2p_row_ns(tab, s, d, n);
+#else
         c2p_row(tab, s, d, h, g0, n, force);
+#endif
 #else
         {
             int x;
@@ -215,8 +287,12 @@ static void c2p_convert(const u32 *tab, const u8 *src, u8 *dst, int buf)
                 u32 v = tab[q[0]] | tab[256 + q[1]] | tab[512 + q[2]] | tab[768 + q[3]];
 #endif
                 u8 *hh = h + 4 * x;
+#ifdef C2P_SCROLL
+                (void)hh; (void)force;
+#else
                 if (!force && hh[0] == q[0] && hh[1] == q[1] && hh[2] == q[2] && hh[3] == q[3]) continue;
                 hh[0] = q[0]; hh[1] = q[1]; hh[2] = q[2]; hh[3] = q[3];
+#endif
                 d[x] = (u8)(v >> 24); d[40 + x] = (u8)(v >> 16); d[80 + x] = (u8)(v >> 8); d[120 + x] = (u8)v;
             }
         }
