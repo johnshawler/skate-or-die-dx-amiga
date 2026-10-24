@@ -6,6 +6,11 @@
 #ifndef C2P_H
 #define C2P_H
 #include "m816.h"
+/* the 256 KB conversion table pays off where most of the picture changes or the picture is dithered (race, joust: 2-14% of a pass); the jam has no memory for it,
+   the ramp and the high jump gain nothing from it */
+#if !defined(C2P_BIGLUT) && !defined(C2P_SMALLLUT) && defined(EV_MODE) && (EV_MODE == 3 || EV_MODE == 5)
+#define C2P_BIGLUT
+#endif
 #ifdef C2P_BIGLUT
 /* One table of 65536 longs: for two source bytes (four pixels) the plane bytes (plane 0 in the top byte) with the four pixels' bits in the upper nibble of
    each plane byte. A group of 8 pixels is lut[first two bytes] | (lut[next two bytes] >> 4). 256 KB of Chip RAM. */

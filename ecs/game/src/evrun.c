@@ -16,7 +16,11 @@
 
 /* the IIGS banks the events use, each only over the pages [lo, hi] (spans.h); the pointers are offset so that B3[0x1234] still means bank 3, offset $1234.
    A bank number the game touches outside its span would land in a neighbour: the spans were taken from long oracle runs (tools/cpu816x/workingset.py). */
+#ifdef T816_REGB3
+static u8 **const ev_bank_ptr[9] = {&P_B0, &P_B1, &P_B2, &P_B2, &P_B4, &P_B5, &P_B7, &P_BE0, &P_BE1};   /* [3] is a register variable: set by hand */
+#else
 static u8 **const ev_bank_ptr[9] = {&P_B0, &P_B1, &P_B2, &P_B3, &P_B4, &P_B5, &P_B7, &P_BE0, &P_BE1};
+#endif
 static const u8 ev_bank_no[9] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x07, 0xE0, 0xE1};
 #define EV_BZ_BYTES 4096UL
 static u32 ev_banks_bytes(void)
@@ -28,7 +32,13 @@ static u32 ev_banks_bytes(void)
 static void ev_map_banks(u32 mem)
 {
     u32 off = 0; int i;
-    for (i = 0; i < 9; i++) { *ev_bank_ptr[i] = (u8 *)(mem + off - (u32)ev_span_lo[i] * 256); off += ((u32)ev_span_hi[i] - ev_span_lo[i] + 1) * 256; }
+    for (i = 0; i < 9; i++) {
+#ifdef T816_REGB3
+        if (i == 3) B3 = (u8 *)(mem + off - (u32)ev_span_lo[i] * 256); else if (i == 2) { P_B2 = (u8 *)(mem + off - (u32)ev_span_lo[i] * 256); } else
+#endif
+        *ev_bank_ptr[i] = (u8 *)(mem + off - (u32)ev_span_lo[i] * 256);
+        off += ((u32)ev_span_hi[i] - ev_span_lo[i] + 1) * 256;
+    }
     P_BZ = (u8 *)mem + off;                                           /* scratch for banks that do not exist: only ever touched by a game bug */
 }
 #define EV_ARENA_BYTES (ev_banks_bytes() + C2P_TAB_BYTES + 64000UL)
@@ -284,6 +294,9 @@ int ev_overlay_main(EvArgs *a)
     ev_lut = (u32 *)(mem + ev_banks_bytes());
     c2p_shadow[0] = (u8 *)ev_lut + C2P_TAB_BYTES; c2p_shadow[1] = c2p_shadow[0] + 32000;
     rt_init();
+#ifdef T816_REGB3
+    BK[3] = B3;
+#endif
     c2p_build_lut(ev_lut);
     c2p_all_dirty();
     pakp = asset_load(pakn[mode], 0, &paks);
@@ -322,7 +335,7 @@ int ev_overlay_main(EvArgs *a)
     cpu.a = cpu.x = cpu.y = 0; cpu.s = 0x1FF; cpu.d = 0; cpu.db = 0; cpu.n = cpu.v = cpu.z = cpu.c = cpu.i = 0;
     io.enabled = 1; io.key_waiting = 0; io.key = 0; io.anykey = 0; io.mods = 0; io.btn[0] = io.btn[1] = io.btn[2] = 0;
     for (i = 0; i < 4; i++) { io.pdl_len[i] = 60; io.pdl_left[i] = 0; }
-    ev_hz = mode == 1 ? 29 : mode == 2 ? 27 : mode == 3 ? 11 : mode == 4 ? 10 : 29;       /* the passes a second the original manages in each event (KEGS, ecs/docs/SOURCE_GATE.md) */
+    ev_hz = mode == 1 ? 29 : mode == 2 ? 27 : mode == 3 ? 11 : mode == 4 ? 10 : 16;       /* the passes a second the original manages in each event (KEGS, ecs/docs/SOURCE_GATE.md) */
     gP = P; ev_vbl = (int)vbl_hz; ev_abort = 0;
     ev_period = (vbl_hz << 16) / (u32)ev_hz; ev_last_tod = *(volatile u8 *)0xBFE801UL; ev_now = 0; ev_due = 0;
     P->evh = P->evt;
@@ -373,5 +386,9 @@ int ev_overlay_main(EvArgs *a)
 __asm(".section .text.start,\"ax\"\n"
       ".globl ev_start\n"
       "ev_start:\n"
+#ifdef T816_REGB3
+      "\tmove.l %a5,-(%sp)\n\tmove.l 8(%sp),-(%sp)\n\tjsr ev_overlay_main\n\taddq.l #4,%sp\n\tmove.l (%sp)+,%a5\n\trts\n"
+#else
       "\tjmp ev_overlay_main\n"
+#endif
       ".text\n");

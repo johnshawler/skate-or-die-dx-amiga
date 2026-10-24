@@ -24,7 +24,11 @@ extern u8 *P_B0, *P_B1, *P_B2, *P_B3, *P_B4, *P_B5, *P_B7, *P_BE0, *P_BE1, *P_BZ
 #define B0 P_B0
 #define B1 P_B1
 #define B2 P_B2
+#ifdef T816_REGB3
+register u8 *B3 __asm__("a5");        /* bank 3 (the game's variables) lives in a5 for the whole overlay: no reload of the pointer after every store */
+#else
 #define B3 P_B3
+#endif
 #define B4 P_B4
 #define B5 P_B5
 #define B7 P_B7
