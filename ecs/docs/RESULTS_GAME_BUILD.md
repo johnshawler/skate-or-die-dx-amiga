@@ -16,8 +16,8 @@ Work per pass = everything except the wait for the next slot (game code, picture
 | Downhill Race | 11 | 57.1 ms | 56.7 | 83.3 | **37%** | 0.3% | 11/11/11 | 135 KB |
 | Downhill Jam | 10 | 75.5 ms | 100.8 | 117.1 | **25%** | 5.2% | 10/10/10 | 176 KB |
 | Pool Joust | 16 | 54.8 ms | 59.9 | 66.1 | **12% (short of 20%)** | 2.2% | 16/16/16 | 197 KB |
-A pass that runs over its slot is followed at once by the next one (no extra wait), so the average rate holds as long as the mean has headroom; the counters show the rate held for all five. The Jam's p95/p99 are above its slot (full-screen scrolling conversion); the worst pass of any event was 0.5 s (a scene load) except Joust's 2.2 s (round change).
-Pace rates: ramp 29.3, high jump 26.7, race 11.1, jam 9.8 are the KEGS means of the source runs (`SOURCE_GATE.md`). **Joust:** the gate's 13.6-14.4/s is the mean over all event frames including the black round-load stretches; counting only one-second windows in which the original actually ran passes, its mean is about 16/s (10-24/s, ten-second windows are mostly 10-20). I paced Joust at 16. At 14/s the same measurement is 23% headroom; at 16/s it is 12%.
+A pass that runs over its slot is followed at once by the next one (no extra wait), so the average rate holds as long as the mean has headroom; the counters show the rate held for all five. The Jam's p95/p99 are above its slot (full-screen scrolling conversion); the worst single pass was 0.12 s (ramp, high jump), 0.5 s (race, jam: a scene load) and 2.2 s (Joust: a round change).
+Pace rates: ramp 29.3, high jump 26.7, race 11.1, jam 9.8 are the KEGS means of the source runs (`SOURCE_GATE.md`). **Joust:** the gate's 13.6-14.4/s is the mean over all event frames including the black round-load stretches; counting only one-second windows in which the original actually ran passes, its mean is about 16/s (one-second windows run 10-24/s, mostly 10-20). I paced Joust at 16. At 14/s the same measurement is 23% headroom; at 16/s it is 12%.
 Unpaced (maximum speed, same input): ramp 40/s, high jump 36/s, race 17/s, jam 13/s, joust 18/s.
 
 ## What was done to get here (all verified, none of it lowers fidelity)
