@@ -13,3 +13,4 @@
 #define N_JG_FB B2
 #define N_JG_FO 0xE000
 #define N_JG_MASK 0x599B
+#define N_BG_SCROLL 1    /* nat_bgfill reports the scroll to the platform (c2p.h, C2P_SCROLL) */

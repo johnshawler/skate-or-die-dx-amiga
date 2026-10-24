@@ -11,10 +11,10 @@
 #if !defined(C2P_BIGLUT) && !defined(C2P_SMALLLUT) && defined(EV_MODE) && (EV_MODE == 3 || EV_MODE == 5)
 #define C2P_BIGLUT
 #endif
-/* The jam (and only the jam so far) scrolls a 168-row window of the picture ($3400-$9CFF, rows 32-199) by whole rows. Its background copy (native.h nat_bgfill) then finds the
+/* The downhill events (race and jam) scroll a 168-row window of the picture ($3400-$9CFF, rows 32-199) by whole rows. Its background copy (native.h nat_bgfill) then finds the
    changed groups by comparing with the old picture shifted by the scroll and reports the scroll (rt_scroll): the planar picture is shifted instead of converted again, and only the changed groups are
    converted, with no shadow copy to compare with. */
-#if !defined(C2P_SCROLL) && ((defined(EV_MODE) && EV_MODE == 4) || defined(C2P_SCROLL_HOST))
+#if !defined(C2P_SCROLL) && ((defined(EV_MODE) && (EV_MODE == 3 || EV_MODE == 4)) || defined(C2P_SCROLL_HOST))
 #define C2P_SCROLL
 #endif
 #ifdef C2P_BIGLUT
@@ -253,7 +253,7 @@ static void c2p_row(const u32 *tab, const u8 *s, u8 *d, u8 *h, int g0, int n, in
 #endif
 
 #ifdef C2P_VERIFY
-/* test builds: the number of bytes of a planar picture that differ from a conversion of the whole chunky picture (the four 256-entry tables only) */
+/* test builds: the number of bytes of a planar picture that differ from a conversion of the whole chunky picture */
 static u32 c2p_verify(const u32 *tab, const u8 *src, const u8 *dst)
 {
     u32 bad = 0;
@@ -261,7 +261,11 @@ static u32 c2p_verify(const u32 *tab, const u8 *src, const u8 *dst)
     for (y = 0; y < 200; y++)
         for (x = 0; x < 40; x++) {
             const u8 *q = src + y * 160 + 4 * x, *d = dst + y * 160 + x;
+#ifdef C2P_BIGLUT
+            u32 v = tab[(q[0] << 8) | q[1]] | (tab[(q[2] << 8) | q[3]] >> 4);
+#else
             u32 v = tab[q[0]] | tab[256 + q[1]] | tab[512 + q[2]] | tab[768 + q[3]];
+#endif
             bad += (d[0] != (u8)(v >> 24)) + (d[40] != (u8)(v >> 16)) + (d[80] != (u8)(v >> 8)) + (d[120] != (u8)v);
         }
     return bad;

@@ -20,6 +20,8 @@
 static int aw_n = AWSTART, aw_i = 0;       /* test builds: the n-th walk goes to the n-th event (1..5), steered by the planned control bytes */
 #endif
 #define TICK_HZ 25   /* original main-loop passes per second (about 107,000 IIGS cycles per pass at 2.8 MHz; an estimate) */
+#define MAP_HZ 50    /* the skater on the map: the NES version takes the same stretch of the map (shop door to the wall below it) in about 67 frames at 60 a second;
+                        the original code needs 57 passes for it, so 50 passes a second (one a frame on a 50 Hz display) gives the NES speed; the animations stay at the 25 a second they were set for */
 
 /* ---- assets: files of the data folder, loaded as needed ---- */
 static const u8 *title_scr, *title_ima, *map_scr, *shop_scr, *list_scr, *scores_scr, *board_scr, *menu_fnt, *skater_spr, *ow_pcm;
@@ -486,8 +488,14 @@ __attribute__((noinline)) int ow_main(void)
         if (fire) ctl &= ~0x10;
 
         int tick = 0;
+        static int map_acc, map_half;
         tick_acc += TICK_HZ;
         if (tick_acc >= vbl_hz) { tick_acc -= vbl_hz; tick = 1; }
+        if (map_mode) {                                         /* the map has its own, faster pass */
+            map_acc += MAP_HZ;
+            tick = 0;
+            if (map_acc >= vbl_hz) { map_acc -= vbl_hz; tick = 1; map_half ^= 1; }
+        }
 
         if (!map_mode) {
             if (tick) {
@@ -522,7 +530,7 @@ __attribute__((noinline)) int ow_main(void)
                 ctl = aw_i < aw_len[aw_n % 5] ? aw_seq[aw_n % 5][aw_i++] : 0xFF;
 #endif
                 sk_step(&sk, ctl);
-                if (map_mode && M->state == MS_MAP) map_animate(P, M);
+                if (map_mode && M->state == MS_MAP && map_half) map_animate(P, M);
                 if (sk.in_shop) {                               /* the shop door: back to Rodney */
                     sk_reset(&sk); map_mode = 0; menu_enter_shop(M);
                 } else if (sk.exit_code) {

@@ -19,7 +19,7 @@ def build(cfgname, debug=True):
     return cfg, lib
 
 BANKS = [0, 1, 2, 3, 4, 5, 7, 0xE0, 0xE1]
-C2P_SCROLL_CFGS = ('ev21',)       # events whose picture conversion works from the scroll (c2p.h, C2P_SCROLL): the planar picture is checked at every pass
+C2P_SCROLL_CFGS = ('ev21', 'ev15')       # events whose picture conversion works from the scroll (c2p.h, C2P_SCROLL): the planar picture is checked at every pass
 
 def c2p_reference(e1):
     """the planar picture (4 planes of 40 bytes per row, rows of 160 bytes) of the 200 rows at E1:$2000"""
