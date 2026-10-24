@@ -13,13 +13,19 @@ def build(cfgname, debug=True):
     cfg = analyze.load_cfg_fix(json.load(open(f'{G}/cfg/{cfgname}.json')))
     outc = f'/tmp/t816_{cfgname}.c'; lib = f'/tmp/lib{cfgname}{"_dbg" if debug else ""}.so'
     subprocess.check_call([sys.executable, f'{G}/tools/gen_ecs.py', f'{G}/cfg/{cfgname}.json', outc], stderr=subprocess.DEVNULL)
-    flags = ['-O1', '-shared', '-fPIC', f'-I{G}/runtime', f'-I{here}/runtime', f'-I{G}/native', f'-I{here}/native', f'-I{G}/src'] + (['-DT816_DEBUG'] if debug else []) + (['-DT816_FAST'] if os.environ.get('T816_FAST') else [])
+    flags = ['-O1', '-shared', '-fPIC', f'-I{G}/runtime', f'-I{here}/runtime', f'-I{G}/native', f'-I{here}/native', f'-I{G}/src'] + (['-DT816_B2DIRTY'] if cfgname in C2P_SCROLL_CFGS else []) + (['-DT816_DEBUG'] if debug else []) + (['-DT816_FAST'] if os.environ.get('T816_FAST') else [])
     srcs = [outc, f'{G}/runtime/m816rt.c'] + ([f'{G}/tools/c2p_host.c'] if cfgname in C2P_SCROLL_CFGS else [])
     subprocess.check_call(['gcc'] + flags + ['-o', lib] + srcs)
     return cfg, lib
 
 BANKS = [0, 1, 2, 3, 4, 5, 7, 0xE0, 0xE1]
 C2P_SCROLL_CFGS = ('ev21', 'ev15')       # events whose picture conversion works from the scroll (c2p.h, C2P_SCROLL): the planar picture is checked at every pass
+
+WIN = (0x3400, 0x9D00)     # the scrolled window of banks 1 and E1: not maintained in the events of C2P_SCROLL_CFGS (the platform converts bank 2 directly), so never compared
+def masked(b, data, masked_on):
+    if masked_on and b in (1, 0xE1):
+        data = bytearray(data); data[WIN[0]:WIN[1]] = bytes(WIN[1] - WIN[0]); data = bytes(data)
+    return data
 
 def c2p_reference(e1):
     """the planar picture (4 planes of 40 bytes per row, rows of 160 bytes) of the 200 rows at E1:$2000"""
@@ -96,6 +102,7 @@ def run(cfgname, mode, passes, trace=False, script=None):
     owl = np.zeros((wl_cap, 2), dtype=np.uint32) if wl_cap else None
     C.wlog_start(owl.ctypes.data if wl_cap else None, wl_cap)
     if trace: C.trace_start(otr.ctypes.data, cap)
+    msk = cfgname in C2P_SCROLL_CFGS; o_pics = []
     hits = 0; ohash = []; orig_io = None; FAST = bool(os.environ.get('T816_FAST')); ostate = []
     import zlib
     apply_input(C.io, script(0))
@@ -106,7 +113,8 @@ def run(cfgname, mode, passes, trace=False, script=None):
         if C.hit_pc() not in hooks: print('oracle: event left the overlay at', hex(C.hit_pc()), 'after', hits, 'passes'); break
         hits += 1
         ohash.append((C.wlog_hash(), C.wlog_n()))
-        if FAST: ostate.append((zlib.crc32(b''.join(bytes(C.mem[b << 16:(b << 16) + 65536]) for b in BANKS)), C.cpu.a, C.cpu.x, C.cpu.y, C.cpu.s, C.cpu.p & 0xC3))
+        if FAST: ostate.append((zlib.crc32(b''.join(masked(b, bytes(C.mem[b << 16:(b << 16) + 65536]), msk) for b in BANKS)), C.cpu.a, C.cpu.x, C.cpu.y, C.cpu.s, C.cpu.p & 0xC3))
+        if msk: o_pics.append(bytes(C.mem[0xE12000:0xE12000 + 32000]))
         if hits > passes: break
         apply_input(C.io, script(hits))
         hp = C.hit_pc(); C.hook(hp, False); C.run(1); C.hook(hp, True)      # step off the hook
@@ -141,13 +149,13 @@ def run(cfgname, mode, passes, trace=False, script=None):
         cur = bytes(rt.rt_bank_ptr(0xE1).contents[0x2000:0x9D00]); dmin = rt.rt_dmin_ptr().contents; dmax = rt.rt_dmax_ptr().contents
         if scroll_cfg:       # the platform's planar picture (spans, scroll shifts) against a conversion of the whole picture
             got = np.frombuffer(bytes(rt.c2p_host_pass().contents), dtype=np.uint8).reshape(200, 160)
-            bad = np.nonzero((got != c2p_reference(cur)).any(axis=1))[0]
+            bad = np.nonzero((got != c2p_reference(o_pics[cnt[0] - 1] if cnt[0] - 1 < len(o_pics) else cur)).any(axis=1))[0]
             if len(bad):
                 c2p_bad[0] += 1
                 if c2p_bad[1] is None: c2p_bad[1] = (cnt[0], bad[:8].tolist())
             dirty_bad[0] += 0; snap[0] = cur
             thash.append((rt.rt_get_wr_hash(), rt.rt_get_wr_n()))
-            if FAST: tstate.append((zlib.crc32(b''.join(bytes(rt.rt_bank_ptr(b).contents) for b in BANKS)), cp.a, cp.x, cp.y, cp.s, (cp.n << 7) | (cp.v << 6) | (cp.z << 1) | cp.c))
+            if FAST: tstate.append((zlib.crc32(b''.join(masked(b, bytes(rt.rt_bank_ptr(b).contents), True) for b in BANKS)), cp.a, cp.x, cp.y, cp.s, (cp.n << 7) | (cp.v << 6) | (cp.z << 1) | cp.c))
             if cnt[0] > passes: return 1
             apply_input(tio, script(cnt[0]))
             return 0
@@ -185,7 +193,7 @@ def run(cfgname, mode, passes, trace=False, script=None):
             print('first pass whose write log differs: %d (oracle n=%d, translated n=%d)' % (k, ohash[k][1], thash[k][1])); ok = False; break
     bad = []
     for b in BANKS:
-        om = bytes(C.mem[b << 16:(b << 16) + 65536]); tm = bytes(rt.rt_bank_ptr(b).contents)
+        om = masked(b, bytes(C.mem[b << 16:(b << 16) + 65536]), msk); tm = masked(b, bytes(rt.rt_bank_ptr(b).contents), msk)
         if om != tm:
             diff = [i for i in range(65536) if om[i] != tm[i]]
             bad.append((b, len(diff), diff[:6])); ok = False

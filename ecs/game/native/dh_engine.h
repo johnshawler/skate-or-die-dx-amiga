@@ -10,34 +10,34 @@
  * effect (checked on the instruction sequence) is one contiguous copy of $6900 bytes from bank 2 at the offset in N_BGSRC to bank 1 at
  * $3400-$9CFF, with shadowing on, so the hardware mirrors it into bank E1. */
 #ifdef N_BG_SCROLL
-/* The jam (c2p.h, C2P_SCROLL): when the window moves by whole rows, a row of the new picture is compared with the row of the old picture (still in bank E1) that has scrolled to its
- * place, and only the groups that differ are marked as changed; the platform moves its planar picture by the scroll (rt_scroll). Without a scroll the old and the new row are compared
- * in place, and only rows that differ are written. Anything else (the first fill, a jump of the offset) fills and marks the whole window as before. */
+/* The downhill events (c2p.h, C2P_SCROLL; T816_B2DIRTY): the picture that the original copies from bank 2 into bank 1 / E1 every pass is never read back, and everything that is drawn
+ * into it is drawn into bank 2 before the copy (checked on the write log). So the copy is not made: the platform converts the window straight from bank 2 (rt_win_src), and the
+ * groups that changed are the ones written into bank 2 since the last fill (rt_b2min/rt_b2max, kept by the stores, the blits and the restore), at the row the window now has.
+ * When the window moves by whole rows (rt_scroll) the platform shifts its planar picture; anything else (the first fill, a jump of the offset, an offset that is not a whole row)
+ * marks the whole window. */
+#ifndef T816_B2DIRTY
+#error "N_BG_SCROLL needs T816_B2DIRTY"
+#endif
 extern u32 rt_bg_prev;
+extern const u8 *rt_win_src;
 extern void rt_scroll(int dy);
 #define BG_ROWS 168
-static int bg_fill_scroll(u16 y0)
+static void bg_window(u16 y0)
 {
     u32 prev = rt_bg_prev;
-    int dy, r;
-    const u32 *nw = (const u32 *)(B2 + y0);
-    u32 *e = (u32 *)(BE1 + 0x3400), *b1 = (u32 *)(B1 + 0x3400);
-    if (prev == 0xFFFFFFFFUL || y0 < prev || (u32)(y0 - prev) > 8UL * 160 || (y0 - prev) % 160) return 0;
-    dy = (int)((y0 - prev) / 160);
-    if (dy) rt_scroll(dy);
-    for (r = 0; r < BG_ROWS; r++) {
-        const u32 *n = nw + 40 * r;
-        int lo = 0, hi = 39, write = 1;
-        if (r + dy < BG_ROWS) {
-            const u32 *o = e + 40 * (r + dy);
-            while (lo < 40 && n[lo] == o[lo]) lo++;
-            if (lo == 40) { hi = -1; write = dy != 0; }
-            else while (n[hi] == o[hi]) hi--;
+    int r;
+    if (prev != 0xFFFFFFFFUL && y0 >= prev && (u32)(y0 - prev) <= 8UL * 160 && (y0 - prev) % 160 == 0 && y0 % 160 == 0) {
+        int dy = (int)((y0 - prev) / 160), row0 = y0 / 160;
+        if (dy) rt_scroll(dy);
+        for (r = 0; r < BG_ROWS; r++) {
+            u32 lo = rt_b2min[row0 + r], hi = rt_b2max[row0 + r];
+            if (lo <= hi) mark_row_(32 + r, lo, hi);
         }
-        if (lo <= hi) mark_row_(32 + r, (u32)lo, (u32)hi);
-        if (write) copy2_bytes((u8 *)(b1 + 40 * r), (u8 *)(e + 40 * r), (const u8 *)n, 160);
+    } else {
+        for (r = 0; r < BG_ROWS; r++) mark_row_(32 + r, 0, 39);
     }
-    return 1;
+    for (r = 0; r < 416; r++) { rt_b2min[r] = 255; rt_b2max[r] = 0; }
+    rt_win_src = B2 + y0;
 }
 #endif
 
@@ -52,7 +52,7 @@ static int nat_bgfill(void)
 #endif
     BE0[0xC035] = (u8)(BE0[0xC035] & 0xF7);
 #ifdef N_BG_SCROLL
-    if (!bg_fill_scroll(y0)) { copy2_bytes(B1 + 0x3400, BE1 + 0x3400, B2 + y0, 0x6900); MARKE1_RANGE(0x3400, 0x6900); }
+    bg_window(y0);
     rt_bg_prev = y0;
 #else
     copy2_bytes(B1 + 0x3400, BE1 + 0x3400, B2 + y0, 0x6900);
@@ -117,6 +117,9 @@ static int nat_dh15_blit(void)
             for (k = 0; k < w; k++) { u16 o = scr[k]; sd[k] = o; scr[k] = (u16)(((o & m[k]) | d[k]) & mk); }
             sd += w; pm += 2 * w; pd += 2 * w;
         }
+#ifdef T816_B2DIRTY
+        { u32 q; for (q = 0; q < rows; q++) B2M((u16)(X + 160 * q), 2 * w); }
+#endif
     }
     DH_FINISH(rows, w, T);
     return 1;
@@ -138,6 +141,9 @@ static int nat_dh21_blit(void)
             for (k = 0; k < w; k++) { u16 o = scr[k], mm = m[k]; t = (u16)((u16)(~mm) & sm & d[k]); sd[k] = o; scr[k] = (u16)((o & mm) | t); }
             sd += w; pm += 2 * w; pd += 2 * w;
         }
+#ifdef T816_B2DIRTY
+        { u32 q; for (q = 0; q < rows; q++) B2M((u16)(X + 160 * q), 2 * w); }
+#endif
         *(u16 *)(B0 + (u16)(cpu.d + 0x1E)) = t;                  /* the last mask word stays in $1E */
     }
     DH_FINISH(rows, w, T);
@@ -159,6 +165,9 @@ static int nat_dh_restore(void)
                 for (k = 0; k < w; k++) scr[k] = sd[k];
                 sd += w;
             }
+#ifdef T816_B2DIRTY
+            for (r = 0; r < rows; r++) B2M((u16)(X + 160 * r), 2 * w);
+#endif
         }
     }
     DH_FINISH(rows, w, T);

@@ -20,6 +20,9 @@ u8 *BK[256] = {(u8 *)1};
 int rt_exit = 1;
 u8 rt_dmin[200] = {1}, rt_dmax[200] = {1};
 u8 rt_rowof[1000] = {1}; u16 rt_rowbase[200] = {1};
+#ifdef T816_B2DIRTY
+u8 rt_b2min[416] = {255}, rt_b2max[416] = {0};
+#endif
 
 #ifdef T816_DEBUG
 uint64_t wr_n, wr_hash; u32 cur_pc;
@@ -61,6 +64,9 @@ void rt_init(void)
     rt_exit = 0;
     for (i = 0; i < 200; i++) { rt_dmin[i] = 0; rt_dmax[i] = 39; rt_rowbase[i] = (u16)(i * 160); }
     for (i = 0; i < 1000; i++) rt_rowof[i] = (u8)(i / 5);
+#ifdef T816_B2DIRTY
+    for (i = 0; i < 416; i++) { rt_b2min[i] = 255; rt_b2max[i] = 0; }
+#endif
 }
 
 #ifndef T816_AMIGA

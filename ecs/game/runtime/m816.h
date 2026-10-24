@@ -70,6 +70,25 @@ static inline void IOWR8(u32 a, u8 *arr, u16 off, u8 v) { WLOG(a, v); arr[off] =
 extern u8 rt_dmin[200], rt_dmax[200];
 #define E1ROW(off) (((((u32)(off) - 0x2000) >> 5) * 205) >> 10)
 static inline void mark_row_(u32 r, u32 lo, u32 hi) { if (lo < rt_dmin[r]) rt_dmin[r] = (u8)lo; if (hi > rt_dmax[r]) rt_dmax[r] = (u8)hi; }
+/* an overlay that scrolls a window of the off-screen picture in bank 2 (the downhill events, T816_B2DIRTY): for each 160-byte row of bank 2 the first and last 4-byte group written
+   since the background fill last looked (first > last: none). The fill uses them to tell which groups of the scrolled picture changed. */
+#ifdef T816_B2DIRTY
+extern u8 rt_b2min[416], rt_b2max[416];
+static inline void MARKB2_RANGE(u16 o, u16 n)
+{
+    u32 a = o, b = (u32)o + n - 1, ra, rb, ga, gb;
+    if (b > 0xFFFF) b = 0xFFFF;
+    ra = a / 160; rb = b / 160; ga = (a - ra * 160) >> 2; gb = (b - rb * 160) >> 2;
+    if (ra == rb) { if (ga < rt_b2min[ra]) rt_b2min[ra] = (u8)ga; if (gb > rt_b2max[ra]) rt_b2max[ra] = (u8)gb; return; }
+    if (ga < rt_b2min[ra]) rt_b2min[ra] = (u8)ga;
+    rt_b2max[ra] = 39;
+    while (++ra < rb) { rt_b2min[ra] = 0; rt_b2max[ra] = 39; }
+    rt_b2min[rb] = 0; if (gb > rt_b2max[rb]) rt_b2max[rb] = (u8)gb;
+}
+#define B2M(o, n) MARKB2_RANGE((u16)(o), (n))
+#else
+#define B2M(o, n) ((void)0)
+#endif
 extern u8 rt_rowof[1000]; extern u16 rt_rowbase[200];     /* row of picture offset (o - $2000) >> 5, and the first offset of each row (set up by rt_init) */
 static inline void MARKE1_RANGE(u16 o, u16 n)             /* bytes [o, o+n) of bank E1 */
 {
@@ -116,6 +135,9 @@ static inline void WR8(u32 a, u8 v)
 #endif
     WLOG(a, v);
     BK[a >> 16][(u16)a] = v;
+#ifdef T816_B2DIRTY
+    if ((a >> 16) == 2) B2M(a, 1);
+#endif
     if ((a >> 16) == 1 && (u16)a >= 0x2000 && (u16)a < 0xA000 && !(BE0[0xC035] & 8)) { BE1[(u16)a] = v; MARKE1((u16)a); }
     else if ((a >> 16) == 0xE1) MARKE1((u16)a);
 }
@@ -146,7 +168,11 @@ M816_INLINE void WR16(u32 a, u16 v)
 #endif
 {
     u32 bk = (a >> 16) & 255;
-    if ((u16)a != 0xFFFF && bk <= 7 && ((M816_FASTBANKS >> bk) & 1)) { WLOG(a & 0xFFFFFF, (u8)v); WLOG((a & 0xFFFFFF) + 1, (u8)(v >> 8)); ST16(&BK[bk][(u16)a], v); return; }
+    if ((u16)a != 0xFFFF && bk <= 7 && ((M816_FASTBANKS >> bk) & 1)) { WLOG(a & 0xFFFFFF, (u8)v); WLOG((a & 0xFFFFFF) + 1, (u8)(v >> 8)); ST16(&BK[bk][(u16)a], v);
+#ifdef T816_B2DIRTY
+        if (bk == 2) B2M(a, 2);
+#endif
+        return; }
     WR16_slow(a, v);
 }
 static inline void WRB1(u16 o, u8 v)    /* static store into bank 1 */
@@ -156,8 +182,8 @@ static inline void WRB1(u16 o, u8 v)    /* static store into bank 1 */
     if (o >= 0x2000 && o < 0xA000 && !(BE0[0xC035] & 8)) { BE1[o] = v; MARKE1(o); }
 }
 /* static stores into the other banks (the shadow rule only concerns bank 1) */
-#define WRS8(arr, bank, o, v) do { WLOG(((u32)(bank) << 16) | (o), (v)); (arr)[o] = (v); } while (0)
-#define WRS16(arr, bank, o, v) do { u16 _mw = (v); WLOG(((u32)(bank) << 16) | (o), (u8)_mw); WLOG(((u32)(bank) << 16) | ((o) + 1), (u8)(_mw >> 8)); ST16(&(arr)[o], _mw); } while (0)
+#define WRS8(arr, bank, o, v) do { WLOG(((u32)(bank) << 16) | (o), (v)); (arr)[o] = (v); if ((bank) == 2) B2M((o), 1); } while (0)
+#define WRS16(arr, bank, o, v) do { u16 _mw = (v); WLOG(((u32)(bank) << 16) | (o), (u8)_mw); WLOG(((u32)(bank) << 16) | ((o) + 1), (u8)(_mw >> 8)); ST16(&(arr)[o], _mw); if ((bank) == 2) B2M((o), 2); } while (0)
 #define WRE1_8(o, v) do { WRS8(BE1, 0xE1, o, v); MARKE1(o); } while (0)
 #define WRE1_16(o, v) do { WRS16(BE1, 0xE1, o, v); MARKE1_RANGE(o, 2); } while (0)
 #define RDS16(arr, o) LE16(&(arr)[o])

@@ -482,6 +482,7 @@ static void ev_prepare(Plat *P, int mode, u32 vbl_hz)
     for (i = 0; i < 4; i++) { io.pdl_len[i] = 60; io.pdl_left[i] = 0; }
     ev_hz = mode == 1 ? 29 : mode == 2 ? 27 : mode == 3 ? 11 : mode == 4 ? 12 : 16;       /* the passes a second the original manages in each event (KEGS, ecs/docs/SOURCE_GATE.md); the jam 20% faster (the original's 10) at the user's request */
     gP = P; ev_vbl = (int)vbl_hz; ev_abort = 0; ev_forced = 0;
+    c2p_all_dirty();                                                 /* every run of an event starts with a picture the converter knows nothing about */
     ev_period = (vbl_hz << 16) / (u32)ev_hz; ev_last_tod = *(volatile u8 *)0xBFE801UL; ev_now = 0; ev_due = 0;
     P->evh = P->evt;
 }

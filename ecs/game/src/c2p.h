@@ -51,6 +51,7 @@ static u8 c2p_pmin[2][200], c2p_pmax[2][200];
 static u8 *c2p_shadow[2]; static u8 c2p_force[2] = { 1, 1 };
 #ifdef C2P_SCROLL
 u32 rt_bg_prev = 0xFFFFFFFFUL;                     /* the scroll offset the picture window was last filled from (all ones: not known) */
+const u8 *rt_win_src = (const u8 *)0;              /* the window's rows 32-199 come from here (bank 2 at that offset); null: from bank E1 like the other rows */
 static u16 c2p_acc[2];                             /* the rows the window has scrolled since each buffer was converted */
 #endif
 
@@ -60,7 +61,7 @@ static void c2p_all_dirty(void)
     c2p_force[0] = c2p_force[1] = 1;
     for (i = 0; i < 200; i++) { c2p_pmin[0][i] = c2p_pmin[1][i] = 0; c2p_pmax[0][i] = c2p_pmax[1][i] = 39; }
 #ifdef C2P_SCROLL
-    c2p_acc[0] = c2p_acc[1] = 0; rt_bg_prev = 0xFFFFFFFFUL;
+    c2p_acc[0] = c2p_acc[1] = 0; rt_bg_prev = 0xFFFFFFFFUL; rt_win_src = (const u8 *)0;
 #endif
 }
 
@@ -261,6 +262,9 @@ static u32 c2p_verify(const u32 *tab, const u8 *src, const u8 *dst)
     for (y = 0; y < 200; y++)
         for (x = 0; x < 40; x++) {
             const u8 *q = src + y * 160 + 4 * x, *d = dst + y * 160 + x;
+#ifdef C2P_SCROLL
+            if (y >= 32 && rt_win_src) q = rt_win_src + (y - 32) * 160 + 4 * x;
+#endif
 #ifdef C2P_BIGLUT
             u32 v = tab[(q[0] << 8) | q[1]] | (tab[(q[2] << 8) | q[3]] >> 4);
 #else
@@ -288,6 +292,9 @@ static void c2p_convert(const u32 *tab, const u8 *src, u8 *dst, int buf)
         if (g0 > g1) continue;
         pmin[y] = 255; pmax[y] = 0;
         s = src + y * 160 + g0 * 4;
+#ifdef C2P_SCROLL
+        if (y >= 32 && rt_win_src) s = rt_win_src + (y - 32) * 160 + g0 * 4;
+#endif
         d = dst + y * 160 + g0;
         h = c2p_shadow[buf] + y * 160 + g0 * 4;
         n = g1 - g0 + 1;
