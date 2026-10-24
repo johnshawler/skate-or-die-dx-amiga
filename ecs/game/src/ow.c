@@ -9,6 +9,13 @@
 #include "os.h"
 #include "skater.h"
 #include "platform.h"
+#ifdef AUTOWALK
+#include "autowalk.h"
+#ifndef AWSTART
+#define AWSTART 0
+#endif
+static int aw_n = AWSTART, aw_i = 0;       /* test builds: the n-th walk goes to the n-th event (1..5), steered by the planned control bytes */
+#endif
 #define TICK_HZ 25   /* original main-loop passes per second (about 107,000 IIGS cycles per pass at 2.8 MHz; an estimate) */
 
 /* ---- assets: files of the data folder, loaded as needed ---- */
@@ -350,6 +357,9 @@ __attribute__((noinline)) int ow_main(void)
                     blit_part(P->B[P->comp], M->shadow_f, (int)M->shadow_x - 24, (int)M->shadow_y - 50);
                 if (menu_pass(M, &gfx, (unsigned)ctl, kbd)) {
                     map_mode = 1; sk_reset(&sk);
+#ifdef AUTOWALK
+                    aw_i = 0;
+#endif
                 }
                 if (notice > 0 && M->state == MS_RODNEY) {          /* the events need about 700 KB of free memory */
                     static const char msg[] = "NOT ENOUGH MEMORY FOR THE EVENTS";
@@ -364,6 +374,9 @@ __attribute__((noinline)) int ow_main(void)
             }
         } else {
             if (tick) {
+#ifdef AUTOWALK
+                ctl = aw_i < aw_len[aw_n % 5] ? aw_seq[aw_n % 5][aw_i++] : 0xFF;
+#endif
                 sk_step(&sk, ctl);
                 if (sk.in_shop) {                               /* the shop door: back to Rodney */
                     sk_reset(&sk); map_mode = 0; menu_enter_shop(M);
@@ -374,6 +387,9 @@ __attribute__((noinline)) int ow_main(void)
                         M->exit_code = 0; sk_reset(&sk);
                         if (code >= 1 && code <= 5) {           /* freestyle ramp, high jump, downhill race, downhill jam, pool joust */
                             if (run_event(P, M, code, (u32)vbl_hz) < 0) notice = 90;
+#ifdef AUTOWALK
+                            aw_n++;
+#endif
                             map_mode = 0; menu_enter_shop(M);
                         }
                     } else {
