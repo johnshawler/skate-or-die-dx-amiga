@@ -32,7 +32,8 @@
    "0x4AC1": "nat_mask_fwd",
    "0x4B3D": "nat_mask_rev",
    "0x3218": "nat_glyph",
-   "0x475B": "nat_joy"
+   "0x475B": "nat_joy",
+   "0x2379": "nat_remap"
   }
  }
 }

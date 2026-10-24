@@ -6,3 +6,5 @@
 #define N_JY_RES 0x651C
 #define N_JY_CNT 0x0018
 #define N_JY_SAVE 1
+
+#define N_JGLYPH 1

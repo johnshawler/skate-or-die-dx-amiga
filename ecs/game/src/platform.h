@@ -262,12 +262,16 @@ typedef struct EvArgs {
 
 /* ---- the display and the OS: we own the machine while playing; AmigaDOS is let in between to read files ---- */
 static u16 g_oldint = 0;
+#ifndef DISPLAY_FMODE
+#define DISPLAY_FMODE 0          /* 16-bit bitplane fetch (64-bit fetch was tried in FS-UAE: no measurable gain, so the safe setting stays) */
+#define DISPLAY_DDFSTOP 0x00D0
+#endif
 static void hw_display(Plat *P)
 {
-    R16(BPLCON0) = 0x4201; R16(BPLCON1) = 0; R16(BPLCON2) = 0; R16(BPLCON4) = 0; R16(FMODE) = 0;
+    R16(BPLCON0) = 0x4201; R16(BPLCON1) = 0; R16(BPLCON2) = 0; R16(BPLCON4) = 0; R16(FMODE) = DISPLAY_FMODE;
     R16(BPL1MOD) = 120; R16(BPL2MOD) = 120;
     R16(DIWSTRT) = 0x2C81; R16(DIWSTOP) = 0xF4C1;
-    R16(DDFSTRT) = 0x0038; R16(DDFSTOP) = 0x00D0;
+    R16(DDFSTRT) = 0x0038; R16(DDFSTOP) = DISPLAY_DDFSTOP;
     R32(COP1LC) = (u32)P->cop;
     R16(COPJMP1) = 0;
 }

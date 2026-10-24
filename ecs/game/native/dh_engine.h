@@ -124,4 +124,49 @@ static int nat_dh_restore(void)
     return 1;
 }
 
+
+/* ---- 383F (jam): draw the 8x8 character in A at the text cursor (columns at $6470, rows at $6472 of bank 3) straight into bank E1 and move the cursor on ---- */
+#ifdef N_JGLYPH
+#ifndef N_JG_COL
+#define N_JG_COL 0x6470        /* the text cursor: column and row words in bank 3 */
+#define N_JG_ROW 0x6472
+#define N_JG_RTB B4            /* the table of screen offsets of character rows (a word per 16 bytes of row number): bank and offset */
+#define N_JG_RTO 0xDE00
+#define N_JG_FB B4             /* the font: 32 bytes a character */
+#define N_JG_FO 0xB600
+#define N_JG_MASK 0x61E4       /* the word the font is ANDed with (bank 3) */
+#endif
+static int nat_glyph_jam(void)
+{
+    u16 ea = cpu.a, ex = cpu.x, ey = cpu.y, s0 = cpu.s, col = G3(N_JG_COL), row = G3(N_JG_ROW), t10, A, dest, fx, r, mask; u8 V = 0, C = 0, N = 0, Z = 0;
+    if (cpu.db != 3) return 0;
+    t10 = (u16)(col << 2); fx = (u16)(ea << 5);
+    if ((u32)fx + N_JG_FO + 32 > 0x10000UL || (u32)((u16)(row << 4)) + N_JG_RTO + 2 > 0x10000UL) return 0;
+    A = LE16(N_JG_RTB + N_JG_RTO + (u16)(row << 4)); C = 0; ADC16(0x2000); ADC16(t10); dest = A;
+    if ((u32)dest + 8UL * 0xA0 > 0xFFF0 || dest < 0x2000 || (u32)dest + 8UL * 0xA0 > 0x9D00) return 0;     /* inside the picture: the usual case */
+    mask = RAW16(B3 + N_JG_MASK);
+    {
+        const u8 *f = N_JG_FB + N_JG_FO + fx; u32 row0 = E1ROW(dest), cg = (dest - 0x2000) - row0 * 160;
+        int fast = (cg & 3) == 0 && cg < 160 - 3;
+        for (r = 0; r < 8; r++) {
+            u16 a = (u16)(dest + r * 0xA0);
+            *(u16 *)(BE1 + a) = (u16)(RAW16(f + 4 * r) & mask); *(u16 *)(BE1 + a + 2) = (u16)(RAW16(f + 4 * r + 2) & mask);
+            if (fast) mark_row_(row0 + r, cg >> 2, cg >> 2); else MARKE1_RANGE(a, 4);
+        }
+    }
+    S3(0x18, 0);
+    B0[2] = (u8)(dest + 8 * 0xA0); B0[3] = (u8)((u16)(dest + 8 * 0xA0) >> 8); B0[4] = 0xE1; B0[0x10] = (u8)t10; B0[0x11] = (u8)(t10 >> 8);
+    /* PHY PHX PHA */
+    B0[s0] = (u8)(ey >> 8); B0[(u16)(s0 - 1)] = (u8)ey; B0[(u16)(s0 - 2)] = (u8)(ex >> 8); B0[(u16)(s0 - 3)] = (u8)ex; B0[(u16)(s0 - 4)] = (u8)(ea >> 8); B0[(u16)(s0 - 5)] = (u8)ea;
+    A = col; C = 0; ADC16(1); S3(N_JG_COL, A); CMP16(A, 0x28);
+    if (!C) goto done;
+    S3(N_JG_COL, 0);
+    A = row; C = 0; ADC16(1); S3(N_JG_ROW, A); CMP16(A, 0x28);
+    if (C) S3(N_JG_ROW, 0);
+done:
+    cpu.a = ea; cpu.x = ex; cpu.y = ey; cpu.n = (u8)(ey >> 15); cpu.z = ey == 0; cpu.v = V; cpu.c = C;
+    (void)N; (void)Z;
+    return 1;
+}
+#endif
 #endif

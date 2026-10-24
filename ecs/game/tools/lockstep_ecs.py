@@ -13,7 +13,7 @@ def build(cfgname, debug=True):
     cfg = analyze.load_cfg_fix(json.load(open(f'{G}/cfg/{cfgname}.json')))
     outc = f'/tmp/t816_{cfgname}.c'; lib = f'/tmp/lib{cfgname}{"_dbg" if debug else ""}.so'
     subprocess.check_call([sys.executable, f'{here}/gen.py', f'{G}/cfg/{cfgname}.json', outc], stderr=subprocess.DEVNULL)
-    flags = ['-O1', '-shared', '-fPIC', f'-I{here}/runtime', f'-I{G}/native', f'-I{here}/native'] + (['-DT816_DEBUG'] if debug else []) + (['-DT816_FAST'] if os.environ.get('T816_FAST') else [])
+    flags = ['-O1', '-shared', '-fPIC', f'-I{G}/runtime', f'-I{here}/runtime', f'-I{G}/native', f'-I{here}/native'] + (['-DT816_DEBUG'] if debug else []) + (['-DT816_FAST'] if os.environ.get('T816_FAST') else [])
     subprocess.check_call(['gcc'] + flags + ['-o', lib, outc, f'{here}/runtime/m816rt.c'])
     return cfg, lib
 

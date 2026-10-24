@@ -22,3 +22,12 @@
 
 #define N_JY_RES 0x4632
 #define N_JY_CNT 0x4616
+
+#define N_REMAP 1
+#define N_RM_TA 0x2800
+#define N_RM_TB 0x2D00
+#define N_RM_TC 0x3200
+#define N_RM_TD 0x3700
+#define N_RM_CNT 0x1E00
+#define N_RM_TAB 0x1800
+#define N_RM_SAVEY 1
