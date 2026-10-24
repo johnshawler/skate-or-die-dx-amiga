@@ -351,6 +351,10 @@ __attribute__((noinline)) int ow_main(void)
         if (M->state != MS_NAME && (keys[0x40] || keys[0x44])) fire = 1;
         if (keys[0x45] || (keys[0x10] && M->state != MS_NAME)) quit = 1;
 #ifdef DEBUG_KEYS
+        if (keys[0x5F] && !(M->state == MS_NAME)) {                    /* Help (testing): the High Scores screen */
+            keys[0x5F] = 0; map_mode = 0; menu_enter_shop(M); M->f70 = 1;
+            continue;
+        }
         if (keys[0x59] && !(M->state == MS_NAME)) {                    /* F10: the shop after a competition (testing the winner's speech) */
             keys[0x59] = 0;
             M->count = 3; M->totals[0] = 3; M->totals[1] = 9; M->totals[2] = 5;
