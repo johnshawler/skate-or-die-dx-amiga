@@ -315,6 +315,7 @@ __attribute__((noinline)) int ow_main(void)
         if (keys[0x4D]) jy = 1;
         if (M->state != MS_NAME && (keys[0x40] || keys[0x44])) fire = 1;
         if (keys[0x45] || (keys[0x10] && M->state != MS_NAME)) quit = 1;
+#ifdef DEBUG_KEYS
         if ((keys[0x50] || keys[0x51] || keys[0x52] || keys[0x53] || keys[0x54]) && !(M->state == MS_NAME)) {    /* F1-F5: go straight to an event (testing) */
             int ev = keys[0x50] ? 1 : keys[0x51] ? 2 : keys[0x52] ? 3 : keys[0x53] ? 4 : 5;
             keys[0x50] = keys[0x51] = keys[0x52] = keys[0x53] = keys[0x54] = 0;
@@ -324,6 +325,7 @@ __attribute__((noinline)) int ow_main(void)
             continue;
         }
 
+#endif
         /* the game's control byte: up accelerates, down brakes, left/right turn; bit clear = pressed */
         int ctl = 0xFF;
         if (jy < 0) ctl &= ~1;
