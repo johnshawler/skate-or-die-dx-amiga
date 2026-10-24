@@ -359,7 +359,21 @@ __attribute__((noinline)) int ow_main(void)
             keys[0x59] = 0;
             M->count = 3; M->totals[0] = 3; M->totals[1] = 9; M->totals[2] = 5;
             { int w; static const char nm[3][9] = {"ANNA", "BOB", "CHARLIE"}; int q; for (q = 0; q < 3; q++) for (w = 0; w < 16; w++) M->names[q][w] = w < 9 ? (u8)nm[q][w] : 0; }
-            map_mode = 0; menu_enter_shop(M); menu_congrats(M);
+            map_mode = 0; menu_enter_shop(M); menu_congrats(M); M->f70 = 1;
+            continue;
+        }
+        if ((keys[0x46] || keys[0x41]) && !(M->state == MS_NAME)) {    /* Delete / Backspace (testing): three skaters compete in the pool joust / the downhill jam alone */
+            int q, w, evn = keys[0x46] ? 5 : 4;
+            keys[0x46] = keys[0x41] = 0;
+            M->count = 3; M->practice = 0; M->compete_all = 0;
+            for (q = 0; q < 3; q++) {
+                static const char nm[3][9] = {"ANNA", "BOB", "CHARLIE"};
+                static const u16 col[3] = {0x0F00, 0x00F0, 0x000F};
+                for (w = 0; w < 16; w++) M->names[q][w] = w < 9 ? (u8)nm[q][w] : 0;
+                M->colour[2 * q] = (u8)(col[q] & 255); M->colour[2 * q + 1] = (u8)(col[q] >> 8); M->board[q] = (u8)(q + 1);
+            }
+            if (run_event(P, M, evn, (u32)vbl_hz) < 0) notice = 90;
+            map_mode = 0; after_event(P, M);
             continue;
         }
         if ((keys[0x56] || keys[0x57]) && !(M->state == MS_NAME)) {    /* F7 / F8: three skaters sign up and compete in the ramp / in all events (testing) */
