@@ -11,7 +11,7 @@ Maps each requirement of the `/rom-first` brief (`BRIEFS.md`, part 1) to its res
 | Amiga CPU | 68020 at an **assumed** 14.19 MHz, no accelerator, instruction cache on | assumption |
 | Chipset / memory | AGA, 2 MB Chip, **no Fast RAM**, Kickstart 3.1 r40.068 A1200 (SHA-256 `6d43840d4099a74170ea0f0425b6257c3891ebcaa39c4d1840075a9ab22b5707`) | agreed; a Fast RAM machine is untested |
 | Video | PAL 50 Hz, 320x200, 16 colours (4 bitplanes) | verified |
-| Update contract | each event at the source pass rate from KEGS (ramp 29, high jump 27, race 11, jam 10, joust 16 passes/s), presented at 50 Hz, **>= 20% headroom** on the mean | proposed by me, accepted by you |
+| Update contract | each event at the source pass rate from KEGS (ramp 29, high jump 27, race 11, joust 16 passes/s; jam 12, which is 20% above the original's 10, by your request), presented at 50 Hz, **>= 20% headroom** on the mean | proposed by me, accepted by you |
 | Fidelity contract | gameplay, graphics/palette/HUD, controls: the original's code runs translated; audio: the NES songs and effects (your decision); no reduced actors, colours or rates | see section 3 |
 | Delivery | executable `SkateOrDie` + `data/` folder (`PROGDIR:`); the HDF is only a carrier | agreed |
 | Final milestone | not pinned down in writing. Used here: cold boot -> title -> shop -> sign-up / practice / competition -> all five events playable -> results, high scores, back to the shop | **my definition; please confirm or change** |
@@ -39,10 +39,10 @@ Maps each requirement of the `/rom-first` brief (`BRIEFS.md`, part 1) to its res
 | Freestyle Ramp | 29 | 24.9 ms | 29.4 | 34.2 | 28% | 1.0% | 333 KB |
 | High Jump | 27 | 28.0 ms | 31.2 | 34.1 | 24% | 0.5% | 325 KB |
 | Downhill Race | 11 | 57.1 ms | 56.7 | 83.3 | 37% | 0.3% | 135 KB |
-| Downhill Jam | 10 | 75.5 ms | 100.8 | 117.1 | 25% | 5.2% | 176 KB |
+| Downhill Jam (12/s: 20% faster than the original, as you asked) | 12 | 55.6 ms | 80.0 | 96.2 | 33% | 4.8% | not re-measured |
 | Pool Joust | 16 | 54.7 ms | 57.2 | 63.2 | **12% (target 20% not met)** | 1.7% | 197 KB |
 
-All five hold their pace (on-screen counter 29/27/11/10/16, lowest equal to average). The race and jam run at the original's rate on this model (their in-game clocks advance the same as on the IIGS emulator within about 1%), so they look as choppy as the IIGS original; the NES version updates at 60 per second, this port does not. Worst single pass 0.12 s (ramp, high jump), 0.5 s (race, jam: a scene load), 2.2 s (joust: a round change).
+All five hold their pace (on-screen counter 29/27/11/12/16; the jam's lowest second was 11, the others equal to their average). The race runs at the original's rate on this model (its in-game clock advances the same as on the IIGS emulator within about 1%) and the jam 20% faster than the original; the NES version updates at 60 per second, this port does not. Worst single pass 0.12 s (ramp, high jump), 0.5 s (race, jam: a scene load), 2.2 s (joust: a round change).
 
 ## 5. Acceptance gate (brief section 5)
 | Requirement | Result | Evidence |
