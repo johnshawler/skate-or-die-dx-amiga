@@ -34,7 +34,29 @@ static void ev_map_banks(u32 mem)
 #define EV_ARENA_BYTES (ev_banks_bytes() + C2P_TAB_BYTES + 64000UL)
 
 static Plat *gP = (Plat *)1;           /* initialised non-zero so it lands in .data */
-static int ev_hz = 24, ev_acc = 0, ev_vbl = 50, ev_frames = 1, ev_abort = 0;
+static int ev_hz = 24, ev_vbl = 50, ev_abort = 0;
+static u32 ev_now = 0, ev_due = 0, ev_period = 0;
+static u8 ev_last_tod = 0;
+#ifdef TIMING
+/* test builds: the work of every pass (game code, picture conversion, input: everything except the wait for the next slot) measured with CIA-A timers A+B cascaded
+   (1.41 us a tick), in units of 64 ticks (90 us), written to PROGDIR:data/timing_<mode>.bin when the event ends */
+#define TM_MAX 20000
+static u16 *tm_buf; static u32 tm_n, tm_last, tm_on;
+static u32 tm_now(void)
+{
+    u32 b, a, b2;
+    do { b = ((u32)*(volatile u8 *)0xBFE701UL << 8) | *(volatile u8 *)0xBFE601UL; a = ((u32)*(volatile u8 *)0xBFE501UL << 8) | *(volatile u8 *)0xBFE401UL;
+         b2 = ((u32)*(volatile u8 *)0xBFE701UL << 8) | *(volatile u8 *)0xBFE601UL; } while (b != b2);
+    return (b << 16) | a;
+}
+static void tm_start(void)
+{
+    *(volatile u8 *)0xBFEE01UL &= 0xC0; *(volatile u8 *)0xBFEF01UL = 0;
+    *(volatile u8 *)0xBFE401UL = 0xFF; *(volatile u8 *)0xBFE501UL = 0xFF; *(volatile u8 *)0xBFE601UL = 0xFF; *(volatile u8 *)0xBFE701UL = 0xFF;
+    *(volatile u8 *)0xBFEF01UL = 0x41; *(volatile u8 *)0xBFEE01UL = (u8)((*(volatile u8 *)0xBFEE01UL & 0xC0) | 0x01);
+    tm_n = 0; tm_on = 0;
+}
+#endif
 #ifdef FPS_ON
 static int fps_on = 1, fps_frames = 0, fps_passes = 0, fps_shown = 0, fps_f10 = 0;
 #else
@@ -42,6 +64,22 @@ static int fps_on = 0, fps_frames = 0, fps_passes = 0, fps_shown = 0, fps_f10 = 
 #endif
 static u32 *ev_lut = (u32 *)1;
 static const u8 *ev_song = 0; static u32 ev_song_size = 0;
+#ifdef MEMLOG
+static u32 ev_free_kb = 0;                                         /* test builds: the Chip RAM still free after the event's files are loaded, shown at the bottom */
+static void ev_draw_number(Plat *P, u32 v, int col, int nd)
+{
+    static const u8 dig[10][5] = {{7,5,5,5,7},{2,6,2,2,7},{7,1,7,4,7},{7,1,7,1,7},{5,5,7,1,1},{7,4,7,1,7},{7,4,7,5,7},{7,1,1,1,1},{7,5,7,5,7},{7,5,7,1,7}};
+    int k, r, p;
+    for (k = nd - 1; k >= 0; k--) {
+        for (r = 0; r < 10; r++) {
+            u8 pt = dig[v % 10][r >> 1], b = (u8)(((pt & 4) ? 0xC0 : 0) | ((pt & 2) ? 0x30 : 0) | ((pt & 1) ? 0x0C : 0));
+            u8 *d = P->B[P->comp] + (188 + r) * 160 + col + k;
+            d[0] = b; for (p = 1; p < 4; p++) d[40 * p] = 0;
+        }
+        v /= 10;
+    }
+}
+#endif
 
 static void ev_load_pak(const u8 *p)
 {
@@ -65,28 +103,14 @@ static void ev_load_pak(const u8 *p)
 
 /* the event's song (IMA ADPCM, streamed through the ring) and the platform's side of the sound driver in INTER bank 7:
    $8003 = play effect A (the IIGS driver's effect numbers are used as NES sound ids), $8006 = start the event's music, $8009 = stop it */
-static void ev_music_start(Plat *P)
-{
-    const u8 *d = ev_song;
-    if (!d) return;
-    P->st_data = d + 8;
-    P->st_total = ((u32)d[0] << 24) | ((u32)d[1] << 16) | ((u32)d[2] << 8) | d[3];
-    P->st_loop = ((u32)d[4] << 24) | ((u32)d[5] << 16) | ((u32)d[6] << 8) | d[7];
-    P->st_blk = 0;
-    music_stop();
-    P->blk = 4096;
-    stream_fill(P, P->ring); stream_fill(P, P->ring + 4096);
-    music_start(P, (u32)P->ring, 8192, P->mper0 == 161 ? 222 : 224, 48);       /* 16 kHz */
-    P->stream = 1;
-}
 u32 rt_jsl(u32 target)
 {
     Plat *P = gP;
     if (P == (Plat *)1) return 0;
     switch (target) {
     case 0x078003: sfx_play(P, (int)(cpu.a & 0xFF)); break;
-    case 0x078006: ev_music_start(P); break;
-    case 0x078009: music_stop(); P->stream = 0; break;
+    case 0x078006: if (ev_song) raw_music_start(P, ev_song, ev_song_size, 48); break;
+    case 0x078009: music_stop(); break;
     }
     return 0;
 }
@@ -138,18 +162,31 @@ int rt_pass(u32 pc)
             v /= 10;
         }
     }
+#ifdef MEMLOG
+    ev_draw_number(P, ev_free_kb, 14, 4);
+#endif
     present(P);
-    /* pacing: EV_HZ passes a second */
-#ifdef EV_UNPACED                                                   /* speed test: no pacing; count 50/60 Hz ticks of CIA-A's time-of-day clock */
-    { static u8 last_tod = 0; u8 t = *(volatile u8 *)0xBFE801UL; fps_frames += (u8)(t - last_tod); last_tod = t; }
-    audio_service(P);
-#else
-    do {
-        frame_wait(P);
-        ev_acc += EV_HZ;
-        fps_frames++;
-    } while (ev_acc < ev_vbl);
-    ev_acc -= ev_vbl;
+#ifdef TIMING
+    { u32 now = tm_now(); if (tm_on && tm_n < TM_MAX && tm_buf) tm_buf[tm_n++] = (u16)((tm_last - now) >> 6); }
+#endif
+    /* pacing: EV_HZ passes a second, measured against CIA-A's time-of-day clock (one tick per frame, 50 or 60 a second). A pass that ran late is followed at once by
+       the next one (no extra wait); a pass far behind does not try to catch up. With EV_UNPACED (speed tests) there is no wait at all. */
+    {
+        u8 t = *(volatile u8 *)0xBFE801UL;
+        u32 dt = (u8)(t - ev_last_tod);
+        ev_last_tod = t; ev_now += dt; fps_frames += (int)dt;
+#ifndef EV_UNPACED
+        ev_due += ev_period;
+        while ((s32)(ev_due - (ev_now << 16)) > 0) {
+            frame_wait(P);
+            t = *(volatile u8 *)0xBFE801UL; dt = (u8)(t - ev_last_tod); ev_last_tod = t; ev_now += dt; fps_frames += (int)dt;
+        }
+        if ((s32)((ev_now << 16) - ev_due) > (s32)(3 * ev_period)) ev_due = ev_now << 16;
+#endif
+        audio_service(P);
+    }
+#ifdef TIMING
+    tm_last = tm_now(); tm_on = 1;
 #endif
     fps_passes++;
     if (fps_frames >= ev_vbl) { fps_shown = fps_passes; fps_passes = 0; fps_frames = 0; }
@@ -169,8 +206,10 @@ int rt_pass(u32 pc)
         if (keys[0x40] || keys[0x44]) fire = 1;
         if (keys[0x58] && !fps_f10) { fps_on ^= 1; fps_f10 = 1; } else if (!keys[0x58]) fps_f10 = 0;
         if (keys[0x45] || ev_abort) { ev_abort = 1; return 1; }  /* ESC leaves the event */
-        io.pdl_len[0] = jx < 0 ? 0 : jx > 0 ? 300 : 60;        /* the paddle timers the original joystick routine measures */
-        io.pdl_len[1] = jy < 0 ? 0 : jy > 0 ? 300 : 60;
+        /* the paddle timers the original joystick routine measures: it waits up to 40 reads for each of two windows, so under 41 reads is "left/up", 41-80 "centre",
+           more "right/down". Short timers (the oracle runs used 0/60/300) save a few thousand instructions a pass; the decisions are the same. */
+        io.pdl_len[0] = jx < 0 ? 0 : jx > 0 ? 96 : 50;
+        io.pdl_len[1] = jy < 0 ? 0 : jy > 0 ? 96 : 50;
         io.btn[0] = fire ? 0x80 : 0;
         io.anykey = 0;
         if (P->evh != P->evt) {
@@ -188,11 +227,11 @@ int rt_pass(u32 pc)
 u32 dispatch_call(u16 addr);
 int ev_overlay_main(EvArgs *a)
 {
-    static const char *const pakn[5] = {0, "ev1.pak", "ev2.pak", "ev3.pak", "ev4.pak"}, *const songn[5] = {0, "ev1.ima", "ev2.ima", "ev3.ima", "ev4.ima"};
+    static const char *const pakn[6] = {0, "ev1.pak", "ev2.pak", "ev3.pak", "ev4.pak", "ev5.pak"}, *const songn[6] = {0, "ev1.raw", "ev2.raw", "ev3.raw", "ev4.raw", "ev5.raw"};
     Plat *P = a->P; Menu *M = (Menu *)a->M; u32 vbl_hz = a->vbl_hz; int mode = a->mode;
     u32 mem, pakp, paks = 0, arena = EV_ARENA_BYTES, sfx_size = 0;
     int i, rc;
-    SysBase = a->SysBase; DOSBase = a->DOSBase; g_oldint = (u16)a->oldint;
+    SysBase = a->SysBase; DOSBase = a->DOSBase; g_clock = a->clock; g_oldint = (u16)a->oldint;
     a->rc = -1;
     mem = AllocMem(arena, MEMF_CLEAR);
     if (!mem) return -1;
@@ -206,8 +245,11 @@ int ev_overlay_main(EvArgs *a)
     if (!pakp) { FreeMem(mem, arena); return -1; }
     ev_load_pak((const u8 *)pakp);
     asset_free((const void *)pakp, paks);
-    ev_song = (const u8 *)asset_load(songn[mode], 0, &ev_song_size);
+    ev_song = (const u8 *)asset_load(songn[mode], MEMF_CHIP, &ev_song_size);     /* played by Paula: chip RAM */
     sfx_raw = (const u8 *)asset_load("sfx.raw", 0, &sfx_size);
+#ifdef MEMLOG
+    ev_free_kb = AvailMem(MEMF_CHIP) >> 10;
+#endif
     os_take(P);
     /* INTER's variables for the players */
     for (i = 0; i < 128; i++) B7[0x6810 + i] = ((u8 *)M->names)[i];
@@ -235,9 +277,13 @@ int ev_overlay_main(EvArgs *a)
     cpu.a = cpu.x = cpu.y = 0; cpu.s = 0x1FF; cpu.d = 0; cpu.db = 0; cpu.n = cpu.v = cpu.z = cpu.c = cpu.i = 0;
     io.enabled = 1; io.key_waiting = 0; io.key = 0; io.anykey = 0; io.mods = 0; io.btn[0] = io.btn[1] = io.btn[2] = 0;
     for (i = 0; i < 4; i++) { io.pdl_len[i] = 60; io.pdl_left[i] = 0; }
-    ev_hz = mode == 1 ? 29 : mode == 2 ? 26 : mode == 3 ? 12 : 11;
-    gP = P; ev_vbl = (int)vbl_hz; ev_acc = 0; ev_abort = 0;
+    ev_hz = mode == 1 ? 29 : mode == 2 ? 27 : mode == 3 ? 11 : mode == 4 ? 10 : 29;       /* the passes a second the original manages in each event (KEGS, ecs/docs/SOURCE_GATE.md) */
+    gP = P; ev_vbl = (int)vbl_hz; ev_abort = 0;
+    ev_period = (vbl_hz << 16) / (u32)ev_hz; ev_last_tod = *(volatile u8 *)0xBFE801UL; ev_now = 0; ev_due = 0;
     P->evh = P->evt;
+#ifdef TIMING
+    tm_buf = (u16 *)AllocMem(TM_MAX * 2, 0); tm_start();
+#endif
     rc = rt_run(dispatch_call, 0x1000);
     for (i = 0; i < 192; i++) M->scores[i] = B7[0x7F00 + i];
     io.enabled = 0;
@@ -247,6 +293,15 @@ int ev_overlay_main(EvArgs *a)
     for (i = 0; i < 200; i++) { poll_keyboard(P); if (!P->keys[0x45]) break; frame_wait(P); }
     P->evh = P->evt;
     os_give();
+#ifdef TIMING
+    if (tm_buf) {
+        char nm[32] = "PROGDIR:data/timing_0.bin"; u32 fh;
+        nm[20] = (char)('0' + mode);
+        fh = dos_Open(nm, 1006);
+        if (fh) { dos_Write(fh, tm_buf, tm_n * 2); dos_Close(fh); }
+        FreeMem((u32)tm_buf, TM_MAX * 2);
+    }
+#endif
     asset_free(ev_song, ev_song_size); ev_song = 0;
     asset_free(sfx_raw, sfx_size); sfx_raw = 0;
     FreeMem(mem, arena);

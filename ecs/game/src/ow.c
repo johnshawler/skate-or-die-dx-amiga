@@ -12,7 +12,7 @@
 #define TICK_HZ 25   /* original main-loop passes per second (about 107,000 IIGS cycles per pass at 2.8 MHz; an estimate) */
 
 /* ---- assets: files of the data folder, loaded as needed ---- */
-static const u8 *title_scr, *title_ima, *map_scr, *shop_scr, *list_scr, *scores_scr, *board_scr, *menu_fnt, *skater_spr, *ow_ima;
+static const u8 *title_scr, *title_ima, *map_scr, *shop_scr, *list_scr, *scores_scr, *board_scr, *menu_fnt, *skater_spr, *ow_pcm;
 static const u8 *pictures[5];                                 /* map, shop, list, board, scores: indexed by PIC_* */
 static u32 title_ima_size, base_size[8];
 
@@ -92,13 +92,13 @@ static void p_palette(void *ctx, const u16 *pal)
 }
 
 /* ---- the files the shop and the map need (screens, font, skater sprites, the overworld song): loaded with AmigaDOS running ---- */
-static const char *const base_names[8] = {"map.scr", "shop.scr", "list.scr", "board.scr", "scores.scr", "menu.fnt", "skater.spr", "ovw.ima"};
-static const u8 **const base_ptr[8] = {&pictures[0], &pictures[1], &pictures[2], &pictures[3], &pictures[4], &menu_fnt, &skater_spr, &ow_ima};
+static const char *const base_names[8] = {"map.scr", "shop.scr", "list.scr", "board.scr", "scores.scr", "menu.fnt", "skater.spr", "ow.raw"};
+static const u8 **const base_ptr[8] = {&pictures[0], &pictures[1], &pictures[2], &pictures[3], &pictures[4], &menu_fnt, &skater_spr, &ow_pcm};
 static int ow_load_base(void)
 {
     int i, ok = 1;
     for (i = 0; i < 8; i++) {
-        *base_ptr[i] = (const u8 *)asset_load(base_names[i], 0, &base_size[i]);
+        *base_ptr[i] = (const u8 *)asset_load(base_names[i], i == 7 ? MEMF_CHIP : 0, &base_size[i]);            /* the song is played by Paula: chip RAM */
         if (!*base_ptr[i]) ok = 0;
     }
     return ok;
@@ -108,27 +108,17 @@ static void ow_free_base(void)
     int i;
     for (i = 0; i < 8; i++) { asset_free(*base_ptr[i], base_size[i]); *base_ptr[i] = 0; }
 }
-/* the overworld song: IMA ADPCM, streamed through the ring like the title song */
+/* the overworld song: an 8-bit loop played straight from chip RAM */
 static void ow_music_start(Plat *P)
 {
-    const u8 *d = ow_ima;
-    if (!d) return;
-    P->st_data = d + 8;
-    P->st_total = ((u32)d[0] << 24) | ((u32)d[1] << 16) | ((u32)d[2] << 8) | d[3];
-    P->st_loop = ((u32)d[4] << 24) | ((u32)d[5] << 16) | ((u32)d[6] << 8) | d[7];
-    P->st_blk = 0;
-    music_stop();
-    P->blk = 4096;
-    stream_fill(P, P->ring); stream_fill(P, P->ring + 4096);
-    music_start(P, (u32)P->ring, 8192, P->mper0, 64);           /* 22 kHz */
-    P->stream = 1;
+    if (ow_pcm) raw_music_start(P, ow_pcm, base_size[7], 64);
 }
 
 /* play event `mode` (1 ramp, 2 high jump, 3 downhill race, 4 downhill jam): free what the shop and map hold, load the event overlay (data/<name>.ovl, one event's
    code at a time) and run it; it loads its own image, song and effects. Returns the overlay's result, -1 if it could not be loaded. */
 static int run_event(Plat *P, Menu *M, int mode, u32 vbl_hz)
 {
-    static const char *const ovl[5] = {0, "PROGDIR:data/ramp.ovl", "PROGDIR:data/hj.ovl", "PROGDIR:data/race.ovl", "PROGDIR:data/jam.ovl"};
+    static const char *const ovl[6] = {0, "PROGDIR:data/ramp.ovl", "PROGDIR:data/hj.ovl", "PROGDIR:data/race.ovl", "PROGDIR:data/jam.ovl", "PROGDIR:data/joust.ovl"};
     EvArgs a;
     u32 seg;
     int rc;
@@ -136,7 +126,7 @@ static int run_event(Plat *P, Menu *M, int mode, u32 vbl_hz)
     os_give();
     ow_free_base();
     seg = dos_LoadSeg(ovl[mode]);
-    a.P = P; a.M = M; a.SysBase = SysBase; a.DOSBase = DOSBase; a.oldint = g_oldint; a.vbl_hz = vbl_hz; a.mode = mode; a.rc = -1;
+    a.P = P; a.M = M; a.SysBase = SysBase; a.DOSBase = DOSBase; a.oldint = g_oldint; a.clock = g_clock; a.vbl_hz = vbl_hz; a.mode = mode; a.rc = -1;
     if (seg) {
         ((int (*)(EvArgs *))((seg << 2) + 4))(&a);
         dos_UnLoadSeg(seg);
@@ -237,6 +227,7 @@ __attribute__((noinline)) int ow_main(void)
     title_scr = (const u8 *)asset_load("title.scr", 0, &title_scr_size);
     title_ima = (const u8 *)asset_load("title.ima", 0, &title_ima_size);
     if (!title_scr || !title_ima || !ow_load_base()) {
+        dos_puts("SkateOrDie: cannot read its data folder (PROGDIR:data) or there is not enough memory.\n");
         asset_free(title_scr, title_scr_size); asset_free(title_ima, title_ima_size); ow_free_base();
         CloseLibrary(DOSBase); CloseLibrary(gb); FreeMem(mem, total);
         return 10;                                              /* the data folder is missing or incomplete */
@@ -272,6 +263,7 @@ __attribute__((noinline)) int ow_main(void)
     hw_display(P);
 
     /* audio: the music streams through a ring on channels 0+1 (left+right); effects use channels 2+3 */
+    g_clock = pal_hz == 50 ? 3546895 : 3579545;
     P->mper0 = pal_hz == 50 ? 161 : 162;                        /* 22050 Hz */
     P->sper = P->mper0;
     R16(DMACON) = 0x8000 | 0x0200 | 0x0100 | 0x0080;            /* DMAEN | BPLEN | COPEN */
@@ -305,9 +297,9 @@ __attribute__((noinline)) int ow_main(void)
         if (keys[0x4D]) jy = 1;
         if (M->state != MS_NAME && (keys[0x40] || keys[0x44])) fire = 1;
         if (keys[0x45] || (keys[0x10] && M->state != MS_NAME)) quit = 1;
-        if ((keys[0x50] || keys[0x51] || keys[0x52] || keys[0x53]) && !(M->state == MS_NAME)) {    /* F1-F4: go straight to an event (testing) */
-            int ev = keys[0x50] ? 1 : keys[0x51] ? 2 : keys[0x52] ? 3 : 4;
-            keys[0x50] = keys[0x51] = keys[0x52] = keys[0x53] = 0;
+        if ((keys[0x50] || keys[0x51] || keys[0x52] || keys[0x53] || keys[0x54]) && !(M->state == MS_NAME)) {    /* F1-F5: go straight to an event (testing) */
+            int ev = keys[0x50] ? 1 : keys[0x51] ? 2 : keys[0x52] ? 3 : keys[0x53] ? 4 : 5;
+            keys[0x50] = keys[0x51] = keys[0x52] = keys[0x53] = keys[0x54] = 0;
             M->practice = 1;
             if (run_event(P, M, ev, (u32)vbl_hz) < 0) notice = 90;
             map_mode = 0; menu_enter_shop(M);
@@ -360,10 +352,10 @@ __attribute__((noinline)) int ow_main(void)
                     if (M->count || M->practice) {
                         int code = sk.exit_code;
                         M->exit_code = 0; sk_reset(&sk);
-                        if (code >= 1 && code <= 4) {           /* freestyle ramp, high jump, downhill race, downhill jam */
+                        if (code >= 1 && code <= 5) {           /* freestyle ramp, high jump, downhill race, downhill jam, pool joust */
                             if (run_event(P, M, code, (u32)vbl_hz) < 0) notice = 90;
                             map_mode = 0; menu_enter_shop(M);
-                        }                                       /* the pool joust is not ported yet: the skater starts again */
+                        }
                     } else {
                         P->comp = P->shown ^ 1;
                         copy32((u32 *)P->B[P->comp], (const u32 *)P->L, SCREEN_BYTES / 4);

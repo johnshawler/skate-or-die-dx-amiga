@@ -134,6 +134,23 @@ static inline void dos_UnLoadSeg(u32 seg)
 {
     __asm volatile("move.l %%a6,-(%%sp)\n\tmove.l %0,%%d1\n\tmove.l %1,%%a6\n\tjsr -156(%%a6)\n\tmove.l (%%sp)+,%%a6" : : "r"(seg), "r"(DOSBase) : DOSCLOB);
 }
+static inline u32 dos_Output(void)
+{
+    u32 r;
+    __asm volatile("move.l %%a6,-(%%sp)\n\tmove.l %1,%%a6\n\tjsr -60(%%a6)\n\tmove.l (%%sp)+,%%a6\n\tmove.l %%d0,%0" : "=r"(r) : "r"(DOSBase) : DOSCLOB);
+    return r;
+}
+static inline void dos_Write(u32 fh, const void *buf, u32 len)
+{
+    __asm volatile("move.l %%a6,-(%%sp)\n\tmove.l %0,%%d1\n\tmove.l %1,%%d2\n\tmove.l %2,%%d3\n\tmove.l %3,%%a6\n\tjsr -48(%%a6)\n\tmove.l (%%sp)+,%%a6"
+                   : : "r"(fh), "r"(buf), "r"(len), "r"(DOSBase) : DOSCLOB);
+}
+static void dos_puts(const char *s)
+{
+    u32 n = 0, out = dos_Output();
+    while (s[n]) n++;
+    if (out) dos_Write(out, s, n);
+}
 static inline u32 AvailMem(u32 flags)
 {
     u32 r;

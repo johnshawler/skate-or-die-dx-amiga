@@ -47,23 +47,43 @@ static const s16 ima_step[89] = {7,8,9,10,11,12,13,14,16,17,19,21,23,25,28,31,34
     4026,4428,4871,5358,5894,6484,7132,7845,8630,9493,10442,11487,12635,13899,15289,16818,18500,20350,22385,24623,27086,29794,32767};
 static const s8 ima_adj[8] = {-1, -1, -1, -1, 2, 4, 6, 8};
 
+/* The decoder runs on tables built once: ima_delta[state + code] = the signed change of the predictor, ima_next[state + code] = the next state (step index * 16).
+   Same arithmetic as the reference decoder (step >> 3, + step, + step >> 1, + step >> 2; predictor clamped to 16 bits; index clamped to 0..88). */
+static s16 ima_delta[89 * 16];
+static u16 ima_next[89 * 16];
+static int ima_ready;
+static void ima_build(void)
+{
+    int i, c;
+    for (i = 0; i < 89; i++)
+        for (c = 0; c < 16; c++) {
+            int step = ima_step[i], d = step >> 3, n = i + ima_adj[c & 7];
+            if (c & 4) d += step;
+            if (c & 2) d += step >> 1;
+            if (c & 1) d += step >> 2;
+            ima_delta[i * 16 + c] = (s16)((c & 8) ? -d : d);
+            ima_next[i * 16 + c] = (u16)((n < 0 ? 0 : n > 88 ? 88 : n) * 16);
+        }
+    ima_ready = 1;
+}
+
 static void ima_block(const u8 *src, s8 *dst)               /* 1024 samples from 4 + 512 bytes */
 {
-    int pred = (s16)(src[0] | (src[1] << 8)), idx = src[2], i;
+    int pred = (s16)(src[0] | (src[1] << 8)), i;
+    u32 st = (u32)src[2] * 16;
+    const s16 *dl = ima_delta;
+    const u16 *nx = ima_next;
+    if (!ima_ready) ima_build();
     src += 4;
     for (i = 0; i < 512; i++) {
-        int b = src[i], k;
-        for (k = 0; k < 2; k++) {
-            int code = k ? b >> 4 : b & 15, step = ima_step[idx], d = step >> 3;
-            if (code & 4) d += step;
-            if (code & 2) d += step >> 1;
-            if (code & 1) d += step >> 2;
-            pred += (code & 8) ? -d : d;
-            if (pred > 32767) pred = 32767; else if (pred < -32768) pred = -32768;
-            idx += ima_adj[code & 7];
-            if (idx < 0) idx = 0; else if (idx > 88) idx = 88;
-            *dst++ = (s8)(pred >> 8);
-        }
+        u32 b = src[i], c = b & 15;
+        pred += dl[st + c]; st = nx[st + c];
+        if ((u32)(pred + 32768) > 65535u) pred = pred < 0 ? -32768 : 32767;
+        *dst++ = (s8)(pred >> 8);
+        c = b >> 4;
+        pred += dl[st + c]; st = nx[st + c];
+        if ((u32)(pred + 32768) > 65535u) pred = pred < 0 ? -32768 : 32767;
+        *dst++ = (s8)(pred >> 8);
     }
 }
 
@@ -221,11 +241,19 @@ static void present(Plat *P)
 }
 
 
+/* an 8-bit looped song file (u16 sample rate, u16 0, samples) played from chip RAM on channels 0+1 */
+static u32 g_clock = 3546895;                               /* Paula's clock: PAL; 3579545 on NTSC machines */
+static void raw_music_start(Plat *P, const u8 *file, u32 size, int vol)
+{
+    u32 rate = ((u32)file[0] << 8) | file[1];
+    music_start(P, (u32)(file + 4), (size - 4) & ~1UL, (u16)(g_clock / rate), vol);
+}
+
 /* what the program hands to an event overlay (data/<event>.ovl) */
 typedef struct EvArgs {
     Plat *P; void *M;
     u32 SysBase, DOSBase;
-    u32 oldint;
+    u32 oldint, clock;
     u32 vbl_hz;
     int mode;
     int rc;

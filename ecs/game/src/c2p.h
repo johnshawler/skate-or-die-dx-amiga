@@ -6,6 +6,9 @@
 #ifndef C2P_H
 #define C2P_H
 #include "m816.h"
+#ifdef C2P_BIGLUT
+#include "c2p_big.h"                                  /* one 256 KB table of 65,536 entries instead of four small ones */
+#else
 
 #define C2P_TAB_LONGS 1024
 #define C2P_TAB_BYTES (C2P_TAB_LONGS * 4)
@@ -124,4 +127,5 @@ static void c2p_convert(const u32 *tab, const u8 *src, u8 *dst, int buf)
     }
     c2p_force[buf] = 0;
 }
+#endif /* C2P_BIGLUT */
 #endif
