@@ -3,6 +3,7 @@
 # usage: run_uae.sh <game.hdf> <out dir> "<steps>"   steps: space-separated  wait:<s>  shot:<name>  key:<xdotool key>[:<hold s>]  down:<key>  up:<key>
 # env: ROM (default roms/Kickstart 3.1 A1200), BOOT (seconds to wait for the boot, default 20), CPUOPT (extra uae lines)
 set -e
+exec 9>/tmp/run_uae.lock; flock 9   # one emulator at a time on the shared display (two runs at once send keys to each other)
 HDF=$(readlink -f "$1"); OUT=$2; STEPS=$3; mkdir -p "$OUT"; OUT=$(readlink -f "$OUT")
 ROM=${ROM:-$(readlink -f "$(dirname "$0")/../../../roms/Kickstart v3.1 r40.068 (1993-12)(Commodore)(A1200)[!].rom")}
 T=$(mktemp -d "$OUT/tmpXXXXXX")

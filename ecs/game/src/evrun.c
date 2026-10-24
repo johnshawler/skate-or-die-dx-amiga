@@ -39,9 +39,9 @@ static u32 ev_now = 0, ev_due = 0, ev_period = 0;
 static u8 ev_last_tod = 0;
 #ifdef TIMING
 /* test builds: the work of every pass (game code, picture conversion, input: everything except the wait for the next slot) measured with CIA-A timers A+B cascaded
-   (1.41 us a tick), in units of 64 ticks (90 us), written to PROGDIR:data/timing_<mode>.bin when the event ends */
+   (1.41 us a tick), in units of 64 ticks (90 us), written to PROGDIR:data/tm_<mode><run>.bin when the event ends: pairs (whole pass, of which the picture conversion) */
 #define TM_MAX 20000
-static u16 *tm_buf; static u32 tm_n, tm_last, tm_on;
+static u16 *tm_buf; static u32 tm_n, tm_last, tm_on; static u16 tm_c2p;
 static u32 tm_now(void)
 {
     u32 b, a, b2;
@@ -142,8 +142,14 @@ int rt_pass(u32 pc)
     poll_run = 0;
     /* picture */
     P->comp = P->shown ^ 1;
+#ifdef TIMING
+    u32 tm_c0 = tm_now();
+#endif
     c2p_collect();
     c2p_convert(ev_lut, BE1 + 0x2000, P->B[P->comp], P->comp);
+#ifdef TIMING
+    tm_c2p = (u16)((tm_c0 - tm_now()) >> 6);
+#endif
     {
         u16 pal[16];
         for (i = 0; i < 16; i++) pal[i] = LE16(BE1 + 0x9E00 + 2 * i);
@@ -167,7 +173,7 @@ int rt_pass(u32 pc)
 #endif
     present(P);
 #ifdef TIMING
-    { u32 now = tm_now(); if (tm_on && tm_n < TM_MAX && tm_buf) tm_buf[tm_n++] = (u16)((tm_last - now) >> 6); }
+    { u32 now = tm_now(); if (tm_on && tm_n + 1 < TM_MAX && tm_buf) { tm_buf[tm_n++] = (u16)((tm_last - now) >> 6); tm_buf[tm_n++] = tm_c2p; } }
 #endif
     /* pacing: EV_HZ passes a second, measured against CIA-A's time-of-day clock (one tick per frame, 50 or 60 a second). A pass that ran late is followed at once by
        the next one (no extra wait); a pass far behind does not try to catch up. With EV_UNPACED (speed tests) there is no wait at all. */
