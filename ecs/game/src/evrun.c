@@ -390,11 +390,14 @@ int rt_pass(u32 pc)
             }
             v /= 10;
         }
-#ifdef C2P_SCROLL
-        for (k = 188; k < 198; k++)                    /* the digits are in the planar pictures only: the next conversion of each buffer puts the picture back (rows move with a scroll) */
-            for (i = 0; i < 2; i++) { if (c2p_pmin[i][k] > 0) c2p_pmin[i][k] = 0; if (c2p_pmax[i][k] < 2) c2p_pmax[i][k] = 2; }
-#endif
     }
+#ifdef C2P_SCROLL
+    if (fps_on) {                                      /* the digits are in the planar picture only: the next conversion of each buffer puts the picture back (the rows move with a scroll) */
+        int k;
+        for (k = 188; k < 198; k++)
+            for (i = 0; i < 2; i++) { if (c2p_pmin[i][k] > 0) c2p_pmin[i][k] = 0; if (c2p_pmax[i][k] < 11) c2p_pmax[i][k] = 11; }
+    }
+#endif
 #ifdef MEMLOG
     ev_draw_number(P, ev_free_kb, 14, 4);
 #endif
