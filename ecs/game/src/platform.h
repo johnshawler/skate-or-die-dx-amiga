@@ -259,6 +259,7 @@ typedef struct EvArgs {
     int rc;
     const u8 *font;                                          /* the shop's font (menu.fnt): INTER's text screens */
     int next;                                               /* out: the competition goes on in this event's overlay (state in Menu.inter); 0 = finished */
+    void *os;                                               /* WHDLoad build: the program's OsApi table (memory, files, overlays) */
     int run, esc;                                           /* test builds: which run of a looped event this is; the player pressed ESC */
 } EvArgs;
 
@@ -279,9 +280,11 @@ static void hw_display(Plat *P)
 }
 static void os_give(void)                                   /* let AmigaDOS run: interrupts on, multitasking on; our picture stays on the screen */
 {
+#ifndef WHDLOAD                                             /* under WHDLoad the loader (resload) looks after the OS itself while it works */
     R16(INTENA) = 0x8000 | g_oldint;
     R16(DMACON) = 0x8000 | 0x0010;                          /* disk DMA for floppies */
     Permit();
+#endif
 }
 static void os_take(Plat *P)                                /* the machine is ours again: no interrupts, our display and audio */
 {

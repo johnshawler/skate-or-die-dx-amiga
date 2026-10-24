@@ -45,6 +45,9 @@ static void ev_map_banks(u32 mem)
 #define EV_ARENA_BYTES (ev_banks_bytes() + C2P_TAB_BYTES + 64000UL)
 
 static Plat *gP = (Plat *)1;           /* initialised non-zero so it lands in .data */
+#ifdef WHD_TRACE
+static u32 tr_pass, tr_poll, tr_text, tr_key;
+#endif
 static int ev_hz = 24, ev_vbl = 50, ev_abort = 0, ev_esc = 0, ev_forced = 0;
 static u32 ev_now = 0, ev_due = 0, ev_period = 0;
 static u8 ev_last_tod = 0;
@@ -326,6 +329,10 @@ void io_poll(void)
 {
     Plat *P = gP;
     if (P == (Plat *)1) return;
+#ifdef WHD_TRACE
+    tr_poll++; if (!io.shr) tr_text++;
+    if ((tr_poll & 1023) == 0) { u32 t[4]; t[0] = tr_pass; t[1] = tr_poll; t[2] = tr_text; t[3] = *(volatile u8 *)0xBFE801UL; g_os->save("trace4.bin", t, 16); }
+#endif
     if (!io.shr) { inter_text_poll(P); return; }
     if (++poll_run < 32) return;
     frame_wait(P);
@@ -344,6 +351,10 @@ int rt_pass(u32 pc)
     Plat *P = gP;
     int i;
     (void)pc;
+#ifdef WHD_TRACE
+    tr_pass++;
+    if ((tr_pass & 31) == 0) { u32 t[4]; t[0] = tr_pass; t[1] = tr_poll; t[2] = tr_text; t[3] = *(volatile u8 *)0xBFE801UL; g_os->save("trace3.bin", t, 16); }
+#endif
     poll_run = 0;
     if (txt_on) inter_text_leave(P);
     /* picture */
@@ -548,8 +559,14 @@ int ev_overlay_main(EvArgs *a)
     Plat *P = a->P; Menu *M = (Menu *)a->M; u32 vbl_hz = a->vbl_hz; int mode = a->mode;
     u32 mem, pakp, paks = 0, arena = EV_ARENA_BYTES, sfx_size = 0, ibin_size = 0;
     int i, rc;
+#ifdef WHDLOAD
+    g_os = (OsApi *)a->os;
+#endif
     SysBase = a->SysBase; DOSBase = a->DOSBase; g_clock = a->clock; g_oldint = (u16)a->oldint;
     a->rc = -1;
+#ifdef WHD_TRACE
+    { u32 t[2]; t[0] = 5; t[1] = arena; g_os->save("trace5.bin", t, 8); }
+#endif
     mem = AllocMem(arena, MEMF_CLEAR);
     if (!mem) return -1;
     ev_map_banks(mem);
@@ -572,6 +589,9 @@ int ev_overlay_main(EvArgs *a)
 #endif
 #ifdef MEMLOG
     ev_free_kb = AvailMem(MEMF_CHIP) >> 10;
+#endif
+#ifdef WHD_TRACE
+    { u32 t[2]; t[0] = 6; t[1] = mem; g_os->save("trace6.bin", t, 8); }
 #endif
     os_take(P);
     ev_font = a->font; txt_on = 0; btn_armed = 1; io.shr = 0; ev_esc = 0;
@@ -656,6 +676,9 @@ int ev_overlay_main(EvArgs *a)
 #endif
 #ifdef DEBUG_KEYS
     if (dbg_n) { u32 fh = dos_Open("PROGDIR:data/dbg.bin", 1006); if (fh) { dos_Write(fh, dbg_t, dbg_n * 4); dos_Close(fh); } dbg_n = 0; }
+#endif
+#ifdef WHD_TRACE
+    { u32 t[4]; t[0] = tr_pass; t[1] = tr_poll; t[2] = tr_text; t[3] = (u32)ev_forced; g_os->save("trace2.bin", t, 16); }
 #endif
     asset_free(ev_song, ev_song_size); ev_song = 0;
     asset_free(sfx_raw, sfx_size); sfx_raw = 0;

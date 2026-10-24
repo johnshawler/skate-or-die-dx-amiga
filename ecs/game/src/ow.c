@@ -7,6 +7,9 @@
  * entry, ESC to quit (Q too, except while typing a name). */
 
 #include "os.h"
+#ifdef WHDLOAD
+#include "whd_glue.h"
+#endif
 #include "skater.h"
 #include "platform.h"
 #ifdef AUTOWALK
@@ -125,7 +128,11 @@ static void ow_music_start(Plat *P)
    code at a time) and run it; it loads its own image, song and effects. Returns the overlay's result, -1 if it could not be loaded. */
 static int run_event(Plat *P, Menu *M, int mode, u32 vbl_hz)
 {
+#ifdef WHDLOAD
+    static const char *const ovl[6] = {0, "ramp.ovx", "hj.ovx", "race.ovx", "jam.ovx", "joust.ovx"};      /* relocatable images of the WHDLoad build (tools/elf2whd.py) */
+#else
     static const char *const ovl[6] = {0, "PROGDIR:data/ramp.ovl", "PROGDIR:data/hj.ovl", "PROGDIR:data/race.ovl", "PROGDIR:data/jam.ovl", "PROGDIR:data/joust.ovl"};
+#endif
     EvArgs a;
     u32 seg;
     int rc;
@@ -134,6 +141,9 @@ static int run_event(Plat *P, Menu *M, int mode, u32 vbl_hz)
     os_give();
     ow_free_base();
     a.P = P; a.M = M; a.SysBase = SysBase; a.DOSBase = DOSBase; a.oldint = g_oldint; a.clock = g_clock; a.vbl_hz = vbl_hz; a.mode = mode; a.rc = -1; a.run = 0; a.esc = 0;
+#ifdef WHDLOAD
+    a.os = g_os;
+#endif
     a.font = M->font; a.next = 0; M->inter_valid = 0;
     seg = 0;
 #ifdef BENCH_LOOP
@@ -166,16 +176,41 @@ static void after_event(Plat *P, Menu *M)
     M->f70 = 0;
     menu_after_event(M);
     if (M->f70) {
-        u32 fh;
         os_give();
-        fh = dos_Open("PROGDIR:data/highs.bin", 1006);
-        if (fh) { dos_Write(fh, M->scores, 192); dos_Close(fh); }
+        file_save("highs.bin", M->scores, 192);
         os_take(P);
     }
     if (M->compete_all) { M->compete_all = 0; menu_congrats(M); }
 }
 
 /* Entry point (first thing in the hunk): preserve the registers AmigaDOS may rely on, run the C code, return its result in d0. */
+#ifdef WHDLOAD
+/* WHDLoad entry (the slave calls it with a0 = resload, a1 = first free byte of the expansion memory after this image, d0 = bytes free there, d1 = base memory size):
+   set up memory and files, then run on a 64 KB stack of our own */
+__asm(".section .text.start,\"ax\"\n"
+      ".globl start\n"
+      "start:\n"
+      "\tmovem.l %d2-%d7/%a2-%a6,-(%sp)\n"
+      "\tmove.l %d1,-(%sp)\n"
+      "\tmove.l %d0,-(%sp)\n"
+      "\tmove.l %a1,-(%sp)\n"
+      "\tmove.l %a0,-(%sp)\n"
+      "\tjsr whd_init\n"
+      "\tlea 16(%sp),%sp\n"
+      "\ttst.l %d0\n"
+      "\tbeq.s 1f\n"
+      "\tmove.l %d0,%a2\n"
+      "\tlea 65536(%a2),%a0\n"
+      "\tmove.l %sp,-(%a0)\n"
+      "\tmove.l %a0,%sp\n"
+      "\tjsr ow_main\n"
+      "\tmove.l (%sp)+,%sp\n"
+      "\tbra.s 2f\n"
+      "1:\tmoveq #20,%d0\n"
+      "2:\tmovem.l (%sp)+,%d2-%d7/%a2-%a6\n"
+      "\trts\n"
+      ".text\n");
+#else
 __asm(".section .text.start,\"ax\"\n"
       ".globl start\n"
       "start:\n"
@@ -205,6 +240,7 @@ __asm(".section .text.start,\"ax\"\n"
       "2:\tmovem.l (%sp)+,%d2-%d7/%a2-%a6\n"
       "\trts\n"
       ".text\n");
+#endif
 
 /* the title screen (the original's start-up stub: picture F52, song 0, wait for a key or the button, then the shop). Returns 1 to quit. */
 static int title_screen(Plat *P)
@@ -244,7 +280,9 @@ static int title_screen(Plat *P)
 
 __attribute__((noinline)) int ow_main(void)
 {
+#ifndef WHDLOAD
     SysBase = *(volatile u32 *)4;
+#endif
 #ifdef TEST_NOCACHE
     CacheControl(0, 1);
 #else
@@ -290,9 +328,14 @@ __attribute__((noinline)) int ow_main(void)
     present(P);
 
     /* take over the machine */
+#ifdef WHDLOAD
+    u32 oldview = 0, oldcop = 0;
+    u8 pal_hz = whd_is_pal() ? 50 : 60;                         /* the display standard (and so the TOD tick rate the pacing counts) */
+#else
     u32 oldview = *(volatile u32 *)(gb + 34);
     u32 oldcop = *(volatile u32 *)(gb + 38);
     u8 pal_hz = *(volatile u8 *)(SysBase + 0x212);
+#endif
     LoadView(gb, 0);
     WaitTOF(gb);
     WaitTOF(gb);

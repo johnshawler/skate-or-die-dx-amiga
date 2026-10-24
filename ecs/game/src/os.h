@@ -46,6 +46,34 @@ typedef int32_t s32;
 #define CIAA_ICR (*(volatile u8 *)0xBFED01UL)
 #define CIAA_CRA (*(volatile u8 *)0xBFEE01UL)
 
+#ifdef WHDLOAD
+/* ---- WHDLoad build: there is no operating system. The program and its overlays reach memory and files through this table
+ * (filled in by the program itself from whd_glue.h; the overlays get its address in EvArgs) ---- */
+typedef struct OsApi {
+    u32 (*alloc)(u32 size, u32 flags);
+    void (*free)(u32 mem, u32 size);
+    u32 (*avail)(u32 flags);
+    u32 (*load)(const char *name, u32 flags, u32 *size);      /* a file of the data folder into a new block */
+    void (*save)(const char *name, const void *data, u32 len);
+    u32 (*loadseg)(const char *name);                         /* an overlay: relocated image, the value is what dos_LoadSeg would give */
+    void (*unloadseg)(u32 seg);
+} OsApi;
+static OsApi *g_os = 0;
+static u32 SysBase = 4, DOSBase = 4;
+static inline u32 AllocMem(u32 size, u32 flags) { return g_os->alloc(size, flags); }
+static inline void FreeMem(u32 mem, u32 size) { g_os->free(mem, size); }
+static inline u32 AvailMem(u32 flags) { return g_os->avail(flags); }
+static inline u32 CacheControl(u32 bits, u32 mask) { (void)bits; (void)mask; return 0; }
+static inline void Forbid(void) {}
+static inline void Permit(void) {}
+static inline u32 OpenLibrary(const char *name, u32 ver) { (void)name; (void)ver; return 1; }
+static inline void CloseLibrary(u32 lib) { (void)lib; }
+static inline void LoadView(u32 gb, u32 view) { (void)gb; (void)view; }
+static inline void WaitTOF(u32 gb) { (void)gb; }
+static inline u32 dos_LoadSeg(const char *name) { return g_os->loadseg(name); }
+static inline void dos_UnLoadSeg(u32 seg) { g_os->unloadseg(seg); }
+static void dos_puts(const char *s) { (void)s; }
+#else
 /* ---- AmigaOS library calls (LVO offsets) ----
  * Operands are moved into the OS registers explicitly inside the asm; d0/d1/a0/a1 are the scratch registers of the
  * AmigaOS calling convention. The file is compiled with -ffixed-a6 so the compiler never keeps anything in a6 (the
@@ -164,6 +192,7 @@ static inline u32 AvailMem(u32 flags)
                    : "=r"(r) : "r"(flags), "r"(SysBase) : OSCLOB);
     return r;
 }
+#endif
 
 #define MEMF_CHIP 2UL
 #define MEMF_CLEAR 0x10000UL
@@ -175,6 +204,11 @@ static inline u32 AvailMem(u32 flags)
 
 /* A file of the data folder ("PROGDIR:data/<name>") read into a new block of memory (flags as for AllocMem). Returns its address, 0 if the
    file or the memory is missing; *size gets the length. Interrupts and the OS must be running (see os_give in the callers). */
+#ifdef WHDLOAD
+static u32 asset_load(const char *name, u32 flags, u32 *size) { return g_os->load(name, flags, size); }
+static void asset_free(const void *p, u32 size) { if (p) FreeMem((u32)p, size + 4); }
+static void file_save(const char *name, const void *data, u32 len) { g_os->save(name, data, len); }
+#else
 static u32 asset_load(const char *name, u32 flags, u32 *size)
 {
     char path[48];
@@ -197,5 +231,18 @@ static u32 asset_load(const char *name, u32 flags, u32 *size)
     return mem;
 }
 static void asset_free(const void *p, u32 size) { if (p) FreeMem((u32)p, size + 4); }
+static void file_save(const char *name, const void *data, u32 len)      /* a file of the data folder, written whole */
+{
+    char path[48];
+    const char *pre = "PROGDIR:data/";
+    int n = 0, i;
+    u32 fh;
+    for (i = 0; pre[i]; i++) path[n++] = pre[i];
+    for (i = 0; name[i] && n < 46; i++) path[n++] = name[i];
+    path[n] = 0;
+    fh = dos_Open(path, 1006);
+    if (fh) { dos_Write(fh, data, len); dos_Close(fh); }
+}
+#endif
 
 #endif
