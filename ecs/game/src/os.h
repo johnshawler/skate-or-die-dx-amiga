@@ -67,6 +67,12 @@ static inline void FreeMem(u32 mem, u32 size)
     __asm volatile("move.l %%a6,-(%%sp)\n\tmove.l %0,%%a1\n\tmove.l %1,%%d0\n\tmove.l %2,%%a6\n\tjsr -210(%%a6)\n\tmove.l (%%sp)+,%%a6"
                    : : "r"(mem), "r"(size), "r"(SysBase) : OSCLOB);
 }
+static inline u32 CacheControl(u32 bits, u32 mask)        /* exec -648: the 68020 instruction cache (bit 0) on or off */
+{
+    register u32 d0 __asm("d0") = bits; register u32 d1 __asm("d1") = mask;
+    __asm volatile("move.l %%a6,-(%%sp)\n\tmove.l %2,%%a6\n\tjsr -648(%%a6)\n\tmove.l (%%sp)+,%%a6" : "+r"(d0), "+r"(d1) : "r"(SysBase) : "a0", "a1", "cc", "memory");
+    return d0;
+}
 static inline void Forbid(void)
 {
     __asm volatile("move.l %%a6,-(%%sp)\n\tmove.l %0,%%a6\n\tjsr -132(%%a6)\n\tmove.l (%%sp)+,%%a6" : : "r"(SysBase) : OSCLOB);

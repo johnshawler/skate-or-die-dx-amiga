@@ -306,14 +306,31 @@ static int nat_glyph(void)
     {
         u32 row0 = E1ROW(start), col = (start - 0x2000) - row0 * 160;
         int fast = (col & 3) == 0 && (u32)start + 8UL * 0xA0 <= 0x9D00;
-        for (r = 0; r < 8; r++) {
-            u16 a = (u16)(start + r * 0xA0);
-            u32 w = *(const u32 *)(B2 + (u16)(glyph * 32 + r * 4));
+        const u32 *f = (const u32 *)(B2 + glyph * 32);
+        u32 *p1 = (u32 *)(B1 + start), *pe = (u32 *)(BE1 + start);
 #ifdef N_JGLMASK
-            w &= ((u32)RAW16(B3 + N_JGLMASK) << 16) | RAW16(B3 + N_JGLMASK);                 /* the pool joust ANDs each font word with a mask word */
+        u32 jm = ((u32)RAW16(B3 + N_JGLMASK) << 16) | RAW16(B3 + N_JGLMASK);                 /* the pool joust ANDs each font word with a mask word */
 #endif
-            *(u32 *)(B1 + a) = w; *(u32 *)(BE1 + a) = w;
-            if (fast) mark_row_(row0 + r, col >> 2, col >> 2); else MARKE1_RANGE(a, 4);
+        if (fast) {
+            u8 *dn = rt_dmin + row0, *dx = rt_dmax + row0, g = (u8)(col >> 2);
+            for (r = 0; r < 8; r++) {
+                u32 w = f[r];
+#ifdef N_JGLMASK
+                w &= jm;
+#endif
+                *p1 = w; *pe = w; p1 += 40; pe += 40;
+                if (g < dn[r]) dn[r] = g;
+                if (g > dx[r]) dx[r] = g;
+            }
+        } else {
+            for (r = 0; r < 8; r++) {
+                u16 a = (u16)(start + r * 0xA0);
+                u32 w = f[r];
+#ifdef N_JGLMASK
+                w &= jm;
+#endif
+                *(u32 *)(B1 + a) = w; *(u32 *)(BE1 + a) = w; MARKE1_RANGE(a, 4);
+            }
         }
     }
     B0[0xDA] = (u8)(start + 8 * 0xA0); B0[0xDB] = (u8)((start + 8 * 0xA0) >> 8); B0[0xDC] = 1;

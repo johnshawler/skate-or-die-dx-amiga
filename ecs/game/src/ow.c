@@ -216,6 +216,11 @@ static int title_screen(Plat *P)
 __attribute__((noinline)) int ow_main(void)
 {
     SysBase = *(volatile u32 *)4;
+#ifdef TEST_NOCACHE
+    CacheControl(0, 1);
+#else
+    CacheControl(1, 1);                                          /* the 68020 instruction cache on (Kickstart does this too; the game code runs from Chip RAM, so it matters a lot) */
+#endif
     u32 total = SCREEN_BYTES * 3 + COP_BYTES + sizeof(Plat) + sizeof(Menu) + 16;     /* Plat holds the effect buffer and the stream ring */
     u32 mem = AllocMem(total, MEMF_CHIP | MEMF_CLEAR);
     if (!mem) return 20;

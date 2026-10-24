@@ -91,10 +91,16 @@ static inline u8 RD8(u32 a) { u32 bk = (a >> 16) & 255; if (io.ramrd && bk == 0 
 #define RD8(a) (BK[((u32)(a) >> 16) & 255][(u16)(a)])
 #endif
 /* (ecs/game copy of tools/t816/runtime/m816.h: RD16/WR16 take the direct way when the two bytes are in one bank that has no special rules; everything else as before) */
+#define M816_INLINE static inline __attribute__((always_inline))
+static __attribute__((noinline)) u16 RD16_slow(u32 a) { u8 l = RD8(a); u8 h = RD8(a + 1); return (u16)(l | (h << 8)); }
 static inline u16 RD16(u32 a)
 {
+#ifdef T816_AUX
     if ((u16)a != 0xFFFF && ((a >> 16) & 255) != 0) return LE16(&BK[(a >> 16) & 255][(u16)a]);
-    { u8 l = RD8(a); u8 h = RD8(a + 1); return (u16)(l | (h << 8)); }
+#else
+    if ((u16)a != 0xFFFF) return LE16(&BK[(a >> 16) & 255][(u16)a]);
+#endif
+    return RD16_slow(a);
 }
 static inline u32 RD24(u32 a) { u8 l = RD8(a); u8 m = RD8(a + 1); u8 h = RD8(a + 2); return (u32)l | ((u32)m << 8) | ((u32)h << 16); }
 /* bank 1 $2000-$9FFF is shadowed into bank E1 unless bit 3 of the shadow register ($E0:C035) is set */
@@ -109,11 +115,22 @@ static inline void WR8(u32 a, u8 v)
     if ((a >> 16) == 1 && (u16)a >= 0x2000 && (u16)a < 0xA000 && !(BE0[0xC035] & 8)) { BE1[(u16)a] = v; MARKE1((u16)a); }
     else if ((a >> 16) == 0xE1) MARKE1((u16)a);
 }
+/* banks that take a plain store: 0 (not with the auxiliary-memory switches), 2, 3, 4, 5, 7 (bank 1 and E1 are shadowed, E0 holds the soft switches) */
+#ifdef T816_AUX
+#define M816_FASTBANKS 0xBCu
+#else
+#define M816_FASTBANKS 0xBDu
+#endif
+static __attribute__((noinline)) void WR16_slow(u32 a, u16 v) { WR8(a, (u8)v); WR8(a + 1, (u8)(v >> 8)); }
+#ifdef T816_AUX
 static inline void WR16(u32 a, u16 v)
+#else
+M816_INLINE void WR16(u32 a, u16 v)
+#endif
 {
     u32 bk = (a >> 16) & 255;
-    if ((u16)a != 0xFFFF && ((bk >= 2 && bk <= 5) || bk == 7)) { WLOG(a & 0xFFFFFF, (u8)v); WLOG((a & 0xFFFFFF) + 1, (u8)(v >> 8)); ST16(&BK[bk][(u16)a], v); return; }
-    WR8(a, (u8)v); WR8(a + 1, (u8)(v >> 8));
+    if ((u16)a != 0xFFFF && bk <= 7 && ((M816_FASTBANKS >> bk) & 1)) { WLOG(a & 0xFFFFFF, (u8)v); WLOG((a & 0xFFFFFF) + 1, (u8)(v >> 8)); ST16(&BK[bk][(u16)a], v); return; }
+    WR16_slow(a, v);
 }
 static inline void WRB1(u16 o, u8 v)    /* static store into bank 1 */
 {
