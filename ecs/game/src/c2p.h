@@ -95,18 +95,19 @@ void rt_scroll(int dy)
     }
 }
 /* rows 32+acc..199 of a planar picture up to rows 32..199-acc */
-static void c2p_shift(u8 *dst, int acc)
+static __attribute__((noinline)) void c2p_shift(u8 *dst, int acc)
 {
     u32 n = (u32)(168 - acc) * 160;
     u8 *d = dst + 32 * 160;
     const u8 *s = d + (u32)acc * 160;
+    const u8 *e = s + n;
     if (acc >= 168) return;
 #ifdef __mc68000__
     __asm__ volatile(
         "1: movem.l (%[s])+,%%d0-%%d7\n\t"
         "movem.l %%d0-%%d7,(%[d])\n\tlea 32(%[d]),%[d]\n\t"
-        "subi.l #32,%[n]\n\tbne.s 1b"
-        : [s] "+a"(s), [d] "+a"(d), [n] "+d"(n) : : "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "memory", "cc");
+        "cmp.l %[s],%[e]\n\tbne.s 1b"
+        : [s] "+a"(s), [d] "+a"(d) : [e] "a"(e) : "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "memory", "cc");
 #else
     { u32 i; for (i = 0; i < n; i++) d[i] = s[i]; }
 #endif
@@ -180,7 +181,7 @@ static void c2p_row_one(const u32 *tab, const u8 *s, u8 *d, u8 *h, int n, int fo
 }
 #ifdef C2P_SCROLL
 /* the groups of a row converted unconditionally, no shadow copy */
-static void c2p_row_ns(const u32 *tab, const u8 *s, u8 *d, int n)
+static __attribute__((noinline)) void c2p_row_ns(const u32 *tab, const u8 *s, u8 *d, int n)
 {
     u32 t2, v, idx = 0;
     n--;
@@ -248,6 +249,22 @@ static void c2p_row(const u32 *tab, const u8 *s, u8 *d, u8 *h, int g0, int n, in
     (void)g0;
     c2p_row_one(tab, s, d, h, n, force);
 #endif
+}
+#endif
+
+#ifdef C2P_VERIFY
+/* test builds: the number of bytes of a planar picture that differ from a conversion of the whole chunky picture (the four 256-entry tables only) */
+static u32 c2p_verify(const u32 *tab, const u8 *src, const u8 *dst)
+{
+    u32 bad = 0;
+    int y, x;
+    for (y = 0; y < 200; y++)
+        for (x = 0; x < 40; x++) {
+            const u8 *q = src + y * 160 + 4 * x, *d = dst + y * 160 + x;
+            u32 v = tab[q[0]] | tab[256 + q[1]] | tab[512 + q[2]] | tab[768 + q[3]];
+            bad += (d[0] != (u8)(v >> 24)) + (d[40] != (u8)(v >> 16)) + (d[80] != (u8)(v >> 8)) + (d[120] != (u8)v);
+        }
+    return bad;
 }
 #endif
 

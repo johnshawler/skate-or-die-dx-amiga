@@ -116,6 +116,9 @@ static int fps_on = 1, fps_frames = 0, fps_passes = 0, fps_shown = 0, fps_f10 = 
 static int fps_on = 0, fps_frames = 0, fps_passes = 0, fps_shown = 0, fps_f10 = 0;      /* F9: show how many passes a second the machine manages */
 #endif
 static u32 *ev_lut = (u32 *)1;
+#ifdef C2P_VERIFY
+static u32 c2pv_n = 1, c2pv_bad = 1;                               /* test builds: the passes checked, and the bytes of the planar picture that were not what a full conversion gives (both start at 1) */
+#endif
 static const u8 *ev_song = 0; static u32 ev_song_size = 0;
 #ifdef MEMLOG
 static u32 ev_free_kb = 0;                                         /* test builds: the Chip RAM still free after the event's files are loaded, shown at the bottom */
@@ -364,6 +367,9 @@ int rt_pass(u32 pc)
 #endif
     c2p_collect();
     c2p_convert(ev_lut, BE1 + 0x2000, P->B[P->comp], P->comp);
+#ifdef C2P_VERIFY
+    c2pv_n++; c2pv_bad += c2p_verify(ev_lut, BE1 + 0x2000, P->B[P->comp]);
+#endif
 #ifdef TIMING
     tm_c2p = (u16)((tm_c0 - tm_now()) >> 6);
 #endif
@@ -384,6 +390,10 @@ int rt_pass(u32 pc)
             }
             v /= 10;
         }
+#ifdef C2P_SCROLL
+        for (k = 188; k < 198; k++)                    /* the digits are in the planar pictures only: the next conversion of each buffer puts the picture back (rows move with a scroll) */
+            for (i = 0; i < 2; i++) { if (c2p_pmin[i][k] > 0) c2p_pmin[i][k] = 0; if (c2p_pmax[i][k] < 2) c2p_pmax[i][k] = 2; }
+#endif
     }
 #ifdef MEMLOG
     ev_draw_number(P, ev_free_kb, 14, 4);
@@ -467,7 +477,7 @@ static void ev_prepare(Plat *P, int mode, u32 vbl_hz)
     cpu.a = cpu.x = cpu.y = 0; cpu.s = 0x1FF; cpu.d = 0; cpu.db = 0; cpu.n = cpu.v = cpu.z = cpu.c = cpu.i = 0;
     io.enabled = 1; io.key_waiting = 0; io.key = 0; io.anykey = 0; io.mods = 0; io.btn[0] = io.btn[1] = io.btn[2] = 0; io.shr = 1;
     for (i = 0; i < 4; i++) { io.pdl_len[i] = 60; io.pdl_left[i] = 0; }
-    ev_hz = mode == 1 ? 29 : mode == 2 ? 27 : mode == 3 ? 11 : mode == 4 ? 10 : 16;       /* the passes a second the original manages in each event (KEGS, ecs/docs/SOURCE_GATE.md) */
+    ev_hz = mode == 1 ? 29 : mode == 2 ? 27 : mode == 3 ? 11 : mode == 4 ? 12 : 16;       /* the passes a second the original manages in each event (KEGS, ecs/docs/SOURCE_GATE.md); the jam 20% faster (the original's 10) at the user's request */
     gP = P; ev_vbl = (int)vbl_hz; ev_abort = 0; ev_forced = 0;
     ev_period = (vbl_hz << 16) / (u32)ev_hz; ev_last_tod = *(volatile u8 *)0xBFE801UL; ev_now = 0; ev_due = 0;
     P->evh = P->evt;
@@ -660,6 +670,14 @@ int ev_overlay_main(EvArgs *a)
         fh = dos_Open(nm, 1006);
         if (fh) { dos_Write(fh, pf_hist, PF_BUCKETS * 4); dos_Close(fh); }
         FreeMem((u32)pf_hist, PF_BUCKETS * 4); pf_hist = 0;
+    }
+#endif
+#ifdef C2P_VERIFY
+    {
+        u32 r[2], fh; r[0] = c2pv_n - 1; r[1] = c2pv_bad - 1;
+        fh = dos_Open("PROGDIR:data/c2pv.bin", 1006);
+        if (fh) { dos_Write(fh, r, 8); dos_Close(fh); }
+        c2pv_n = c2pv_bad = 1;
     }
 #endif
 #ifdef TIMING
