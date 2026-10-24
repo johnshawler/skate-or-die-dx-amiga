@@ -94,10 +94,10 @@ static void p_palette(void *ctx, const u16 *pal)
 /* ---- the files the shop and the map need (screens, font, skater sprites, the overworld song): loaded with AmigaDOS running ---- */
 static const char *const base_names[8] = {"map.scr", "shop.scr", "list.scr", "board.scr", "scores.scr", "menu.fnt", "skater.spr", "ow.raw"};
 static const u8 **const base_ptr[8] = {&pictures[0], &pictures[1], &pictures[2], &pictures[3], &pictures[4], &menu_fnt, &skater_spr, &ow_pcm};
-static int ow_load_base(void)
+static int ow_load_base(int with_music)
 {
     int i, ok = 1;
-    for (i = 0; i < 8; i++) {
+    for (i = 0; i < (with_music ? 8 : 7); i++) {
         *base_ptr[i] = (const u8 *)asset_load(base_names[i], i == 7 ? MEMF_CHIP : 0, &base_size[i]);            /* the song is played by Paula: chip RAM */
         if (!*base_ptr[i]) ok = 0;
     }
@@ -125,14 +125,22 @@ static int run_event(Plat *P, Menu *M, int mode, u32 vbl_hz)
     music_stop(); R16(DMACON) = 0x000F; P->stream = 0;
     os_give();
     ow_free_base();
+    a.P = P; a.M = M; a.SysBase = SysBase; a.DOSBase = DOSBase; a.oldint = g_oldint; a.clock = g_clock; a.vbl_hz = vbl_hz; a.mode = mode; a.rc = -1; a.run = 0; a.esc = 0;
+    seg = 0;
+#ifdef BENCH_LOOP
+    for (;;) {                                                  /* test builds: play the event again and again until ESC (each run writes its own timing file) */
+#endif
     seg = dos_LoadSeg(ovl[mode]);
-    a.P = P; a.M = M; a.SysBase = SysBase; a.DOSBase = DOSBase; a.oldint = g_oldint; a.clock = g_clock; a.vbl_hz = vbl_hz; a.mode = mode; a.rc = -1;
     if (seg) {
         ((int (*)(EvArgs *))((seg << 2) + 4))(&a);
         dos_UnLoadSeg(seg);
     }
+#ifdef BENCH_LOOP
+    if (!seg || a.esc || ++a.run >= 24) break;
+    }
+#endif
     rc = seg ? a.rc : -1;
-    ow_load_base();
+    ow_load_base(1);
     os_take(P);
     ow_music_start(P);
     return rc;
@@ -226,7 +234,7 @@ __attribute__((noinline)) int ow_main(void)
     u32 title_scr_size = 0;
     title_scr = (const u8 *)asset_load("title.scr", 0, &title_scr_size);
     title_ima = (const u8 *)asset_load("title.ima", 0, &title_ima_size);
-    if (!title_scr || !title_ima || !ow_load_base()) {
+    if (!title_scr || !title_ima || !ow_load_base(0)) {
         dos_puts("SkateOrDie: cannot read its data folder (PROGDIR:data) or there is not enough memory.\n");
         asset_free(title_scr, title_scr_size); asset_free(title_ima, title_ima_size); ow_free_base();
         CloseLibrary(DOSBase); CloseLibrary(gb); FreeMem(mem, total);
@@ -281,7 +289,12 @@ __attribute__((noinline)) int ow_main(void)
     if (title_screen(P)) quit = 1;
     asset_free(title_ima, title_ima_size); title_ima = 0;       /* 1.1 MB: only the title needs it */
     asset_free(title_scr, title_scr_size); title_scr = 0;
-    ow_music_start(P);
+    if (!quit) {                                                /* the shop's song (Chip RAM: it is played by Paula) comes once the title's memory is free */
+        music_stop(); os_give();
+        ow_pcm = (const u8 *)asset_load("ow.raw", MEMF_CHIP, &base_size[7]);
+        os_take(P);
+        ow_music_start(P);
+    }
 
     while (!quit) {
         poll_keyboard(P);

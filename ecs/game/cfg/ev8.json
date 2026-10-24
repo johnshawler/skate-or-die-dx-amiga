@@ -1,0 +1,33 @@
+{
+ "file": "../../work/res/F8.bin",
+ "base": 4096,
+ "bank": 3,
+ "entry": 4096,
+ "inline": {
+  "0x031C34": [
+   1,
+   "z"
+  ]
+ },
+ "patched_jmp": {
+  "0x1550": "0x1551"
+ },
+ "dispatch_table": {
+  "0x1550": [
+   "0x394A",
+   9
+  ]
+ },
+ "pass_hook": "0x107D",
+ "native": {
+  "consts": "hj_consts.h",
+  "fast": {
+   "0x444E": "nat_push",
+   "0x42C0": "nat_mask_rev",
+   "0x4252": "nat_mask_fwd",
+   "0x440D": "nat_copy_rev",
+   "0x43D7": "nat_copy_fwd",
+   "0x26B5": "nat_glyph"
+  }
+ }
+}

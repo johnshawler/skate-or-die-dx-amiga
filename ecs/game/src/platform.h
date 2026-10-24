@@ -257,6 +257,7 @@ typedef struct EvArgs {
     u32 vbl_hz;
     int mode;
     int rc;
+    int run, esc;                                           /* test builds: which run of a looped event this is; the player pressed ESC */
 } EvArgs;
 
 /* ---- the display and the OS: we own the machine while playing; AmigaDOS is let in between to read files ---- */

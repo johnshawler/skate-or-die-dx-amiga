@@ -1,0 +1,37 @@
+{
+ "file": "../../work/res/F28.bin",
+ "base": 4096,
+ "bank": 3,
+ "entry": 4096,
+ "inline": {
+  "0x03201F": [
+   1,
+   "z"
+  ]
+ },
+ "patched_jsr": {
+  "0x16FE": "0x16FF"
+ },
+ "dispatch_table": {
+  "0x16FE": [
+   "0x4E4D",
+   11
+  ]
+ },
+ "pass_hook": "0x10A6",
+ "extra_pass_hooks": [
+  "0x314F"
+ ],
+ "native": {
+  "consts": "joust_consts.h",
+  "header": "engine.h",
+  "fast": {
+   "0x4CDC": "nat_push",
+   "0x4C65": "nat_copy_fwd",
+   "0x4C9B": "nat_copy_rev",
+   "0x4AC1": "nat_mask_fwd",
+   "0x4B3D": "nat_mask_rev",
+   "0x3218": "nat_glyph"
+  }
+ }
+}

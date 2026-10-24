@@ -295,8 +295,8 @@ int ev_overlay_main(EvArgs *a)
     os_give();
 #ifdef TIMING
     if (tm_buf) {
-        char nm[32] = "PROGDIR:data/timing_0.bin"; u32 fh;
-        nm[20] = (char)('0' + mode);
+        char nm[32] = "PROGDIR:data/tm_0a.bin"; u32 fh;
+        nm[16] = (char)('0' + mode); nm[17] = (char)('a' + a->run);
         fh = dos_Open(nm, 1006);
         if (fh) { dos_Write(fh, tm_buf, tm_n * 2); dos_Close(fh); }
         FreeMem((u32)tm_buf, TM_MAX * 2);
@@ -305,7 +305,7 @@ int ev_overlay_main(EvArgs *a)
     asset_free(ev_song, ev_song_size); ev_song = 0;
     asset_free(sfx_raw, sfx_size); sfx_raw = 0;
     FreeMem(mem, arena);
-    a->rc = rc;
+    a->rc = rc; a->esc = ev_abort;
     return rc;
 }
 

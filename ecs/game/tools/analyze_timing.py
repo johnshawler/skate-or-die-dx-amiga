@@ -1,0 +1,14 @@
+#!/usr/bin/env python3
+"""Per-pass work times of an event from the TIMING build: analyze_timing.py <mode> <pass rate per second> <dir with tm_<mode>?.bin>
+Each sample is the time between the end of one pacing wait and the start of the next (the game code, the picture conversion and the input), in 90 us units."""
+import sys, glob, struct, os
+import numpy as np
+mode, hz, d = int(sys.argv[1]), float(sys.argv[2]), sys.argv[3]
+vals = []
+for f in sorted(glob.glob(os.path.join(d, 'tm_%d*.bin' % mode))):
+    b = open(f, 'rb').read(); vals += list(struct.unpack('>%dH' % (len(b) // 2), b))
+a = np.array(vals, dtype=np.float64) * 64 * 1.4098 / 1000.0     # ms
+slot = 1000.0 / hz
+print('samples %d  slot %.1f ms (%.1f passes/s)' % (len(a), slot, hz))
+print('work per pass ms: median %.1f  mean %.1f  p95 %.1f  p99 %.1f  max %.1f' % (np.median(a), a.mean(), np.percentile(a, 95), np.percentile(a, 99), a.max()))
+print('passes over the slot: %d (%.2f%%)   over 2 slots: %d' % ((a > slot).sum(), 100.0 * (a > slot).mean(), (a > 2 * slot).sum()))
