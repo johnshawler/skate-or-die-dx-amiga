@@ -31,7 +31,8 @@
    "0x4C9B": "nat_copy_rev",
    "0x4AC1": "nat_mask_fwd",
    "0x4B3D": "nat_mask_rev",
-   "0x3218": "nat_glyph"
+   "0x3218": "nat_glyph",
+   "0x475B": "nat_joy"
   }
  }
 }

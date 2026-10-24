@@ -64,7 +64,8 @@
   "consts": "dh21_consts.h",
   "header": "dh_engine.h",
   "fast": {
-   "0x3B03": "nat_bgfill"
+   "0x3B03": "nat_bgfill",
+   "0x532C": "nat_joy"
   },
   "mid": {
    "0x4A04": [

@@ -27,7 +27,9 @@
    "0x4867": "nat_mask_fwd",
    "0x4A22": "nat_copy_rev",
    "0x49EC": "nat_copy_fwd",
-   "0x2C83": "nat_glyph"
+   "0x2C83": "nat_glyph",
+   "0x2588": "nat_remap",
+   "0x44FC": "nat_joy"
   }
  }
 }

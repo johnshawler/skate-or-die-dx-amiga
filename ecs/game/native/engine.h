@@ -235,6 +235,22 @@ static int nat_push(void)
                     if (ra == rb && ra + rows <= 200) { row0 = (u16)ra; mg0 = (u16)(((a - 0x2000) - ra * 160) >> 2); mg1 = (u16)(((b - 0x2000) - ra * 160) >> 2); fastmark = 1; }
                 }
             }
+            if (fastmark && k16 == 0xFFFF && k156 == 0xFFFF) {      /* the usual rectangle: one run of words per row, rows 160 bytes apart, all inside the picture */
+                u16 nb = (u16)(2 * (khi - klo)), off = (u16)(X + 2 * klo + 0xB4);
+                if (nb) {
+                    const u32 *sp = (const u32 *)(B1 + off); u32 *dp = (u32 *)(BE1 + off); u8 *dn = rt_dmin + row0, *dx = rt_dmax + row0;
+                    u16 nl = (u16)(nb >> 2), q;
+                    for (r = 0; r < rows; r++) {
+                        for (q = 0; q < nl; q++) dp[q] = sp[q];
+                        if (nb & 2) *(u16 *)(dp + nl) = *(const u16 *)(sp + nl);
+                        if (mg0 < dn[r]) dn[r] = (u8)mg0;
+                        if (mg1 > dx[r]) dx[r] = (u8)mg1;
+                        sp = (const u32 *)((const u8 *)sp + 160); dp = (u32 *)((u8 *)dp + 160);
+                    }
+                }
+                Xpre = (u16)(X + 160 * (rows - 1) + 2 * ec); X = (u16)(X + 160 * rows);
+                rows = 0;
+            }
             for (r = 0; r < rows; r++) {
                 u16 lo = 0xFFFF, hi = 0;
 #define PUSH_RUN(a0, nw) do { u16 _a = (a0), _n = (nw); \
@@ -312,4 +328,29 @@ static int nat_glyph(void)
     cpu.n = (u8)(entry_y >> 15); cpu.z = entry_y == 0; cpu.v = V; cpu.c = C;
     return 1;
 }
+
+/* ---- 2588 (ramp) / 1FC0 (high jump): X = index of a sprite: recolour in place, through the byte table at $02:1200, the bytes of two column lists
+ * ($02:2E00/3200 and $02:3600/3A00 give the two 24-bit pointers, $02:2600 the count of words); the pointers are left in $E2-$E4 and $E6-$E8 ---- */
+#ifdef N_REMAP
+static int nat_remap(void)
+{
+    u16 x0 = cpu.x, A, n2, y, s0 = cpu.s, a, b, c, d, last = 0; u8 N = 0, V = 0, Z = 0, C = 0, *p1, *p2; const u8 *t = B2 + 0x1200; u32 b1, b2;
+    if (cpu.d != 0 || x0 >= 0x4000) return 0;
+    n2 = (u16)(2 * LE16(B2 + 0x2600 + x0));
+    if (n2 > 0xFF) return 0;
+    a = LE16(B2 + 0x2E00 + x0); c = LE16(B2 + 0x3600 + x0);
+    A = LE16(B2 + 0x3200 + x0); C = 0; ADC16(0x0400); b = A;
+    A = LE16(B2 + 0x3A00 + x0); C = 0; ADC16(0x0500); d = A;
+    b1 = b >> 8; b2 = d >> 8;
+    if (b1 < 2 || b1 == 6 || b1 > 7 || b2 < 2 || b2 == 6 || b2 > 7) return 0;      /* banks 2-5 and 7 only: no shadowing, no soft switches */
+    if ((u32)((a & 0xFF) | ((b & 0xFF) << 8)) + n2 > 0xFFFF || (u32)((c & 0xFF) | ((d & 0xFF) << 8)) + n2 > 0xFFFF) return 0;
+    p1 = BK[b1] + ((a & 0xFF) | ((b & 0xFF) << 8)); p2 = BK[b2] + ((c & 0xFF) | ((d & 0xFF) << 8));
+    for (y = n2; y; y--) { last = t[p1[y]]; p1[y] = (u8)last; last = t[p2[y]]; p2[y] = (u8)last; }
+    B0[0xE2] = (u8)a; B0[0xE3] = (u8)b; B0[0xE4] = (u8)(b >> 8); B0[0xE6] = (u8)c; B0[0xE7] = (u8)d; B0[0xE8] = (u8)(d >> 8);
+    B0[s0] = (u8)(x0 >> 8); B0[(u16)(s0 - 1)] = (u8)x0;
+    cpu.a = last; cpu.y = 0; cpu.x = x0; cpu.n = (u8)(x0 >> 15); cpu.z = x0 == 0; cpu.v = V; cpu.c = C;
+    (void)N; (void)Z;
+    return 1;
+}
+#endif
 #endif

@@ -57,6 +57,45 @@ static void tm_start(void)
     tm_n = 0; tm_on = 0;
 }
 #endif
+#ifdef PROFILE_PC
+/* profiling builds: CIA-B timer A interrupts about every 1.4 ms (level 6) and counts the interrupted PC in 16-byte buckets of the overlay; the histogram is written to
+   PROGDIR:data/pf_<mode><run>.bin (u32 counts, big-endian) when the event ends. Real time on the real bus: what a sampling profiler on the Amiga would see. */
+#define PF_BUCKETS 16384
+u32 *pf_hist; u32 pf_base;
+extern char ev_start[];
+void pf_irq(void);
+__asm(".globl pf_irq\n"
+      "pf_irq:\n"
+      "\tmovem.l %d0/%a0,-(%sp)\n"
+      "\tmove.w #0x2000,0xDFF09C\n"
+      "\ttst.b 0xBFDD00\n"
+      "\tmove.l 10(%sp),%d0\n"
+      "\tsub.l pf_base,%d0\n"
+      "\tbcs.s 1f\n"
+      "\tlsr.l #4,%d0\n"
+      "\tcmp.l #16384,%d0\n"
+      "\tbcc.s 1f\n"
+      "\tmove.l pf_hist,%a0\n"
+      "\taddq.l #1,(%a0,%d0.l*4)\n"
+      "1:\tmovem.l (%sp)+,%d0/%a0\n"
+      "\trte\n");
+static u32 pf_oldvec;
+static void pf_start(void)
+{
+    pf_hist = (u32 *)AllocMem(PF_BUCKETS * 4, MEMF_CLEAR); pf_base = (u32)ev_start;
+    if (!pf_hist) return;
+    pf_oldvec = *(volatile u32 *)0x78UL; *(volatile u32 *)0x78UL = (u32)pf_irq;
+    *(volatile u8 *)0xBFDE00UL = 0x00; *(volatile u8 *)0xBFDD00UL = 0x7F;
+    *(volatile u8 *)0xBFD400UL = 0xFF; *(volatile u8 *)0xBFD500UL = 0x03;       /* 1023 ticks of 1.4 us */
+    *(volatile u8 *)0xBFDD00UL = 0x81; *(volatile u8 *)0xBFDE00UL = 0x01;     /* continuous, on */
+    R16(INTREQ) = 0x2000; R16(INTENA) = 0xE000;
+}
+static void pf_stop(void)
+{
+    R16(INTENA) = 0x2000; *(volatile u8 *)0xBFDE00UL = 0x00; *(volatile u8 *)0xBFDD00UL = 0x7F; R16(INTREQ) = 0x2000;
+    if (pf_hist) *(volatile u32 *)0x78UL = pf_oldvec;
+}
+#endif
 #ifdef FPS_ON
 static int fps_on = 1, fps_frames = 0, fps_passes = 0, fps_shown = 0, fps_f10 = 0;
 #else
@@ -290,7 +329,13 @@ int ev_overlay_main(EvArgs *a)
 #ifdef TIMING
     tm_buf = (u16 *)AllocMem(TM_MAX * 2, 0); tm_start();
 #endif
+#ifdef PROFILE_PC
+    pf_start();
+#endif
     rc = rt_run(dispatch_call, 0x1000);
+#ifdef PROFILE_PC
+    pf_stop();
+#endif
     for (i = 0; i < 192; i++) M->scores[i] = B7[0x7F00 + i];
     io.enabled = 0;
     R16(DMACON) = 0x000F;                                            /* music and effects off */
@@ -299,6 +344,15 @@ int ev_overlay_main(EvArgs *a)
     for (i = 0; i < 200; i++) { poll_keyboard(P); if (!P->keys[0x45]) break; frame_wait(P); }
     P->evh = P->evt;
     os_give();
+#ifdef PROFILE_PC
+    if (pf_hist) {
+        char nm[32] = "PROGDIR:data/pf_0a.bin"; u32 fh;
+        nm[16] = (char)('0' + mode); nm[17] = (char)('a' + a->run);
+        fh = dos_Open(nm, 1006);
+        if (fh) { dos_Write(fh, pf_hist, PF_BUCKETS * 4); dos_Close(fh); }
+        FreeMem((u32)pf_hist, PF_BUCKETS * 4); pf_hist = 0;
+    }
+#endif
 #ifdef TIMING
     if (tm_buf) {
         char nm[32] = "PROGDIR:data/tm_0a.bin"; u32 fh;

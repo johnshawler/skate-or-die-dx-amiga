@@ -22,6 +22,8 @@ rt = ctypes.CDLL(lib)
 rt.rt_bank_ptr.restype = ctypes.POINTER(ctypes.c_uint8 * 65536); rt.rt_cpu.restype = ctypes.c_void_p; rt.rt_dmin_ptr.restype = ctypes.POINTER(ctypes.c_uint8 * 200)
 class Cpu(ctypes.Structure): _fields_ = [('a', ctypes.c_uint16), ('x', ctypes.c_uint16), ('y', ctypes.c_uint16), ('s', ctypes.c_uint16), ('d', ctypes.c_uint16), ('db', ctypes.c_uint8), ('n', ctypes.c_uint8), ('v', ctypes.c_uint8), ('z', ctypes.c_uint8), ('c', ctypes.c_uint8), ('i', ctypes.c_uint8)]
 cp = Cpu.from_address(rt.rt_cpu())
+rt.rt_io_ptr.restype = ctypes.c_void_p
+nio = C.IO.from_address(rt.rt_io_ptr())
 rt.rt_init()
 E.load_mode(mode); C.io.enabled = 1
 script = lockstep.make_script(kind, seed)
@@ -58,7 +60,13 @@ while k < passes and got < samples:
             rnd = random.Random(seen)
             C.wr16(0x030000 | K['N_GCOL'], rnd.choice([0, 1, 0x26, 0x27, 0x28, rnd.randrange(0, 0x28)])); C.wr16(0x030000 | K['N_GROW'], rnd.choice([0, 0x17, 0x18, 0x19, rnd.randrange(0, 0x19)]))
             C.cpu.a = rnd.choice([0, 1, 0x20, 0x41, rnd.randrange(0, 0x60)])
-        before = snap(); rg = (C.cpu.a, C.cpu.x, C.cpu.y, C.cpu.s, C.cpu.d, C.cpu.db, C.cpu.p)
+        if os.environ.get('T816_MUTATE') and 'joy' in fn:             # paddle timers of every length the Amiga build uses, and timers still running at entry
+            import random
+            rnd = random.Random(seen * 7 + 1)
+            for q in range(4): C.io.pdl_len[q] = rnd.choice([0, 0, 50, 96, 60, 300, rnd.randrange(0, 130)])
+            for q in range(2): C.io.pdl_left[q] = rnd.choice([0, 0, rnd.randrange(0, 130)])
+            C.io.btn[0] = rnd.choice([0, 0x80])
+        before = snap(); iob = (list(C.io.pdl_len), list(C.io.pdl_left), C.io.btn[0]); rg = (C.cpu.a, C.cpu.x, C.cpu.y, C.cpu.s, C.cpu.d, C.cpu.db, C.cpu.p)
         ret = (C.rd16(0x000000 | (C.cpu.s + 1)) + 1) & 0xFFFF
         C.hook(p, False); C.hook(0x030000 | ret)
         r2 = C.run(5_000_000)
@@ -68,6 +76,8 @@ while k < passes and got < samples:
         # native from the same state
         for i, b in enumerate(BANKS): ctypes.memmove(rt.rt_bank_ptr(b), before[b], 65536)
         cp.a, cp.x, cp.y, cp.s, cp.d, cp.db = rg[0], rg[1], rg[2], rg[3], rg[4], rg[5]
+        for q in range(4): nio.pdl_len[q] = iob[0][q]; nio.pdl_left[q] = iob[1][q]
+        nio.btn[0] = iob[2]
         pp = rg[6]; cp.n, cp.v, cp.z, cp.c, cp.i = (pp >> 7) & 1, (pp >> 6) & 1, (pp >> 1) & 1, pp & 1, (pp >> 2) & 1
         got += 1
         if not rt.t_run():
@@ -85,6 +95,8 @@ while k < passes and got < samples:
                 if tm != after[b]:
                     d = [j for j in range(65536) if tm[j] != after[b][j]]
                     ok_ = False; msgs.append('bank %02x: %d bytes differ, first %s (native/oracle)' % (b, len(d), [(hex(j), tm[j], after[b][j]) for j in d[:6]]))
+            if 'joy' in fn and (list(nio.pdl_left) != list(C.io.pdl_left)):
+                ok_ = False; msgs.append('timers native %s oracle %s' % (list(nio.pdl_left), list(C.io.pdl_left)))
             if ok_: ok += 1
             else:
                 bad += 1

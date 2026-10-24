@@ -12,3 +12,8 @@
 #define N_GCOL 0x3C17
 #define N_GROW 0x3C19
 #define N_GTMP 0x3C1D
+
+#define N_REMAP 1
+
+#define N_JY_RES 0x3C35
+#define N_JY_CNT 0x3C1B

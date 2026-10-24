@@ -19,3 +19,6 @@
 #define N_JOUST 1
 #define N_ROWTAB 0x4600
 #define N_PUSH_STORES 1
+
+#define N_JY_RES 0x4632
+#define N_JY_CNT 0x4616
