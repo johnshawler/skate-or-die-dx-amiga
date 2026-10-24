@@ -7,11 +7,14 @@
 #define C2P_H
 #include "m816.h"
 #ifdef C2P_BIGLUT
-#include "c2p_big.h"                                  /* one 256 KB table of 65,536 entries instead of four small ones */
-#else
-
-#define C2P_TAB_LONGS 1024
+/* One table of 65536 longs: for two source bytes (four pixels) the plane bytes (plane 0 in the top byte) with the four pixels' bits in the upper nibble of
+   each plane byte. A group of 8 pixels is lut[first two bytes] | (lut[next two bytes] >> 4). 256 KB of Chip RAM. */
+#define C2P_TAB_LONGS 65536
 #define C2P_TAB_BYTES (C2P_TAB_LONGS * 4)
+#else
+#define C2P_TAB_LONGS 1024                            /* four tables of 256: one source byte (two pixels) -> the plane bytes' bits for those two pixels */
+#define C2P_TAB_BYTES (C2P_TAB_LONGS * 4)
+#endif
 static void c2p_build_lut(u32 *t)
 {
     int j, b, k;
@@ -26,7 +29,11 @@ static void c2p_build_lut(u32 *t)
             }
             part[j][b] = v;
         }
+#ifdef C2P_BIGLUT
+    { int hi, lo; for (hi = 0; hi < 256; hi++) for (lo = 0; lo < 256; lo++) t[(hi << 8) | lo] = part[0][hi] | part[1][lo]; }
+#else
     for (b = 0; b < 256; b++) { t[b] = part[0][b]; t[256 + b] = part[1][b]; t[512 + b] = part[0][b] >> 4; t[768 + b] = part[1][b] >> 4; }
+#endif
 }
 
 static u8 c2p_pmin[2][200], c2p_pmax[2][200];
@@ -54,6 +61,126 @@ static void c2p_collect(void)
     }
 }
 
+#ifdef __mc68000__
+/* the plane bytes of one 8-pixel group (four chunky bytes in register `v`, destroyed) into register `r` (plane 0 in the top byte); %[i] is a data register whose
+   upper bytes are zero, %[t0]-%[t3] address the tables */
+#ifdef C2P_BIGLUT
+#define C2P_GROUP(v, r) \
+    "move.w " v ",%[i]\n\tmove.l (%[t0],%[i].l*4)," r "\n\tlsr.l #4," r "\n\t" \
+    "swap " v "\n\tmove.w " v ",%[i]\n\tor.l (%[t0],%[i].l*4)," r "\n\t"
+#else
+#define C2P_GROUP(v, r) \
+    "rol.l #8," v "\n\tmove.b " v ",%[i]\n\tmove.l (%[t0],%[i].l*4)," r "\n\t" \
+    "rol.l #8," v "\n\tmove.b " v ",%[i]\n\tor.l (%[t1],%[i].l*4)," r "\n\t" \
+    "rol.l #8," v "\n\tmove.b " v ",%[i]\n\tor.l (%[t2],%[i].l*4)," r "\n\t" \
+    "rol.l #8," v "\n\tmove.b " v ",%[i]\n\tor.l (%[t3],%[i].l*4)," r "\n\t"
+#endif
+#ifdef C2P_BIGLUT
+#define C2P_GROUP_D C2P_GROUP
+#define C2P_T1(tab) (tab)
+#define C2P_T2(tab) (tab)
+#define C2P_T3(tab) (tab)
+#else
+#define C2P_GROUP_D(v, r) \
+    "rol.l #8," v "\n\tmove.b " v ",%[i]\n\tmove.l (%[t0],%[i].l*4)," r "\n\t" \
+    "rol.l #8," v "\n\tmove.b " v ",%[i]\n\tor.l (1024,%[t0],%[i].l*4)," r "\n\t" \
+    "rol.l #8," v "\n\tmove.b " v ",%[i]\n\tor.l (2048,%[t0],%[i].l*4)," r "\n\t" \
+    "rol.l #8," v "\n\tmove.b " v ",%[i]\n\tor.l (3072,%[t0],%[i].l*4)," r "\n\t"
+#define C2P_T1(tab) ((tab) + 256)
+#define C2P_T2(tab) ((tab) + 512)
+#define C2P_T3(tab) ((tab) + 768)
+#endif
+#define C2P_TABS : [t0] "a"(tab), [t1] "a"(C2P_T1(tab)), [t2] "a"(C2P_T2(tab)), [t3] "a"(C2P_T3(tab))
+
+/* One group at a time. */
+static void c2p_row_one(const u32 *tab, const u8 *s, u8 *d, u8 *h, int n, int force)
+{
+    u32 t2, v, idx = 0;
+    n--;
+    if (force) {                                        /* convert every group and remember the chunky bytes */
+        __asm__ volatile(
+            "1: move.l (%[s])+,%[v]\n\t"
+            "move.l %[v],(%[h])+\n\t"
+            C2P_GROUP_D("%[v]", "%[a]")
+            "move.b %[a],120(%[d])\n\tlsr.l #8,%[a]\n\t"
+            "move.b %[a],80(%[d])\n\tlsr.l #8,%[a]\n\t"
+            "move.b %[a],40(%[d])\n\tlsr.l #8,%[a]\n\t"
+            "move.b %[a],(%[d])+\n\t"
+            "dbra %[n],1b"
+            : [s] "+a"(s), [d] "+a"(d), [h] "+a"(h), [n] "+d"(n), [i] "+d"(idx), [a] "=&d"(t2), [v] "=&d"(v)
+            : [t0] "a"(tab) : "memory", "cc");
+    } else {
+        __asm__ volatile(
+            "1: move.l (%[s])+,%[v]\n\t"
+            "cmp.l (%[h])+,%[v]\n\t"
+            "beq.s 2f\n\t"
+            "move.l %[v],-4(%[h])\n\t"
+            C2P_GROUP_D("%[v]", "%[a]")
+            "move.b %[a],120(%[d])\n\tlsr.l #8,%[a]\n\t"
+            "move.b %[a],80(%[d])\n\tlsr.l #8,%[a]\n\t"
+            "move.b %[a],40(%[d])\n\tlsr.l #8,%[a]\n\t"
+            "move.b %[a],(%[d])\n\t"
+            "2: addq.l #1,%[d]\n\t"
+            "dbra %[n],1b"
+            : [s] "+a"(s), [d] "+a"(d), [h] "+a"(h), [n] "+d"(n), [i] "+d"(idx), [a] "=&d"(t2), [v] "=&d"(v)
+            : [t0] "a"(tab) : "memory", "cc");
+    }
+}
+#ifndef C2P_NOPAIR
+/* Two groups (16 pixels) at a time, writing a word to each plane instead of two bytes: the two lookups' plane bytes (a0 a1 a2 a3, b0 b1 b2 b3) are
+   interleaved into the words a0b0 a1b1 a2b2 a3b3. The shadow copy sits at a constant distance from the picture, so it is addressed with an index register
+   (no register for a second pointer). d must be even. */
+#define C2P_INTERLEAVE \
+    "move.l %[a],%[v0]\n\tand.l #0xFF00FF00,%[v0]\n\t" \
+    "move.l %[b],%[v1]\n\tlsr.l #8,%[v1]\n\tand.l #0x00FF00FF,%[v1]\n\tor.l %[v1],%[v0]\n\t" \
+    "lsl.l #8,%[a]\n\tand.l #0xFF00FF00,%[a]\n\tand.l #0x00FF00FF,%[b]\n\tor.l %[b],%[a]\n\t" \
+    "move.w %[v0],80(%[d])\n\tswap %[v0]\n\tmove.w %[v0],(%[d])\n\t" \
+    "move.w %[a],120(%[d])\n\tswap %[a]\n\tmove.w %[a],40(%[d])\n\t"
+static void c2p_row_pairs(const u32 *tab, const u8 *s, u8 *d, u8 *h, int npairs, int force)
+{
+    u32 delta = (u32)h - (u32)s, v0, v1, a, b, i = 0;
+    npairs--;
+    if (force) {
+        __asm__ volatile(
+            "1: move.l (%[s])+,%[v0]\n\tmove.l (%[s])+,%[v1]\n\t"
+            "move.l %[v0],-8(%[s],%[dl].l)\n\tmove.l %[v1],-4(%[s],%[dl].l)\n\t"
+            C2P_GROUP("%[v0]", "%[a]")
+            C2P_GROUP("%[v1]", "%[b]")
+            C2P_INTERLEAVE
+            "addq.l #2,%[d]\n\t"
+            "dbra %[n],1b"
+            : [s] "+a"(s), [d] "+a"(d), [n] "+d"(npairs), [i] "+d"(i), [a] "=&d"(a), [b] "=&d"(b), [v0] "=&d"(v0), [v1] "=&d"(v1)
+            : [dl] "d"(delta), [t0] "a"(tab), [t1] "a"(C2P_T1(tab)), [t2] "a"(C2P_T2(tab)), [t3] "a"(C2P_T3(tab)) : "memory", "cc");
+    } else {
+        __asm__ volatile(
+            "1: move.l (%[s])+,%[v0]\n\tmove.l (%[s])+,%[v1]\n\t"
+            "cmp.l -8(%[s],%[dl].l),%[v0]\n\tbne.s 3f\n\t"
+            "cmp.l -4(%[s],%[dl].l),%[v1]\n\tbeq.w 2f\n\t"
+            "3: move.l %[v0],-8(%[s],%[dl].l)\n\tmove.l %[v1],-4(%[s],%[dl].l)\n\t"
+            C2P_GROUP("%[v0]", "%[a]")
+            C2P_GROUP("%[v1]", "%[b]")
+            C2P_INTERLEAVE
+            "2: addq.l #2,%[d]\n\t"
+            "dbra %[n],1b"
+            : [s] "+a"(s), [d] "+a"(d), [n] "+d"(npairs), [i] "+d"(i), [a] "=&d"(a), [b] "=&d"(b), [v0] "=&d"(v0), [v1] "=&d"(v1)
+            : [dl] "d"(delta), [t0] "a"(tab), [t1] "a"(C2P_T1(tab)), [t2] "a"(C2P_T2(tab)), [t3] "a"(C2P_T3(tab)) : "memory", "cc");
+    }
+}
+#endif
+/* the groups g0..g0+n-1 of a row: `s`, `d`, `h` point at group g0 of the chunky picture, the planes and the shadow copy */
+static void c2p_row(const u32 *tab, const u8 *s, u8 *d, u8 *h, int g0, int n, int force)
+{
+#ifndef C2P_NOPAIR
+    if (g0 & 1) { c2p_row_one(tab, s, d, h, 1, force); s += 4; d += 1; h += 4; n--; }
+    if (n >= 2) { int np = n >> 1; c2p_row_pairs(tab, s, d, h, np, force); s += 8 * np; d += 2 * np; h += 8 * np; n -= 2 * np; }
+    if (n) c2p_row_one(tab, s, d, h, n, force);
+#else
+    (void)g0;
+    c2p_row_one(tab, s, d, h, n, force);
+#endif
+}
+#endif
+
 /* convert the pending groups of display buffer `buf` */
 static void c2p_convert(const u32 *tab, const u8 *src, u8 *dst, int buf)
 {
@@ -71,52 +198,17 @@ static void c2p_convert(const u32 *tab, const u8 *src, u8 *dst, int buf)
         h = c2p_shadow[buf] + y * 160 + g0 * 4;
         n = g1 - g0 + 1;
 #ifdef __mc68000__
-        {
-            u32 t2, v, idx = 0;
-            n--;
-            if (force) {                                        /* the whole picture: convert every group and remember the chunky bytes */
-                __asm__ volatile(
-                    "moveq #0,%[i]\n"
-                    "1: move.l (%[s])+,%[v]\n\t"
-                    "move.l %[v],(%[h])+\n\t"
-                    "rol.l #8,%[v]\n\tmove.b %[v],%[i]\n\tmove.l (%[l],%[i].l*4),%[a]\n\t"
-                    "rol.l #8,%[v]\n\tmove.b %[v],%[i]\n\tor.l (1024,%[l],%[i].l*4),%[a]\n\t"
-                    "rol.l #8,%[v]\n\tmove.b %[v],%[i]\n\tor.l (2048,%[l],%[i].l*4),%[a]\n\t"
-                    "rol.l #8,%[v]\n\tmove.b %[v],%[i]\n\tor.l (3072,%[l],%[i].l*4),%[a]\n\t"
-                    "move.b %[a],120(%[d])\n\tlsr.l #8,%[a]\n\t"
-                    "move.b %[a],80(%[d])\n\tlsr.l #8,%[a]\n\t"
-                    "move.b %[a],40(%[d])\n\tlsr.l #8,%[a]\n\t"
-                    "move.b %[a],(%[d])+\n\t"
-                    "dbra %[n],1b"
-                    : [s] "+a"(s), [d] "+a"(d), [h] "+a"(h), [n] "+d"(n), [i] "+d"(idx), [a] "=&d"(t2), [v] "=&d"(v)
-                    : [l] "a"(tab) : "memory", "cc");
-            } else {
-                __asm__ volatile(
-                    "moveq #0,%[i]\n"
-                    "1: move.l (%[s])+,%[v]\n\t"
-                    "cmp.l (%[h])+,%[v]\n\t"
-                    "beq.s 2f\n\t"
-                    "move.l %[v],-4(%[h])\n\t"
-                    "rol.l #8,%[v]\n\tmove.b %[v],%[i]\n\tmove.l (%[l],%[i].l*4),%[a]\n\t"
-                    "rol.l #8,%[v]\n\tmove.b %[v],%[i]\n\tor.l (1024,%[l],%[i].l*4),%[a]\n\t"
-                    "rol.l #8,%[v]\n\tmove.b %[v],%[i]\n\tor.l (2048,%[l],%[i].l*4),%[a]\n\t"
-                    "rol.l #8,%[v]\n\tmove.b %[v],%[i]\n\tor.l (3072,%[l],%[i].l*4),%[a]\n\t"
-                    "move.b %[a],120(%[d])\n\tlsr.l #8,%[a]\n\t"
-                    "move.b %[a],80(%[d])\n\tlsr.l #8,%[a]\n\t"
-                    "move.b %[a],40(%[d])\n\tlsr.l #8,%[a]\n\t"
-                    "move.b %[a],(%[d])\n\t"
-                    "2: addq.l #1,%[d]\n\t"
-                    "dbra %[n],1b"
-                    : [s] "+a"(s), [d] "+a"(d), [h] "+a"(h), [n] "+d"(n), [i] "+d"(idx), [a] "=&d"(t2), [v] "=&d"(v)
-                    : [l] "a"(tab) : "memory", "cc");
-            }
-        }
+        c2p_row(tab, s, d, h, g0, n, force);
 #else
         {
             int x;
             for (x = 0; x < n; x++) {
                 const u8 *q = s + 4 * x;
+#ifdef C2P_BIGLUT
+                u32 v = tab[(q[0] << 8) | q[1]] | (tab[(q[2] << 8) | q[3]] >> 4);
+#else
                 u32 v = tab[q[0]] | tab[256 + q[1]] | tab[512 + q[2]] | tab[768 + q[3]];
+#endif
                 u8 *hh = h + 4 * x;
                 if (!force && hh[0] == q[0] && hh[1] == q[1] && hh[2] == q[2] && hh[3] == q[3]) continue;
                 hh[0] = q[0]; hh[1] = q[1]; hh[2] = q[2]; hh[3] = q[3];
@@ -127,5 +219,4 @@ static void c2p_convert(const u32 *tab, const u8 *src, u8 *dst, int buf)
     }
     c2p_force[buf] = 0;
 }
-#endif /* C2P_BIGLUT */
 #endif

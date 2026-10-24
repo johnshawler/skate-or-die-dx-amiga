@@ -22,10 +22,10 @@ uae_cpu_memory_cycle_exact = true
 uae_cpu_compatible = true
 $CPUOPT
 CFG
-xdpyinfo -display :98 >/dev/null 2>&1 || (Xvfb :98 -screen 0 1024x768x24 >/dev/null 2>&1 &) ; sleep 1
+xdpyinfo -display :98 >/dev/null 2>&1 || (Xvfb :98 -screen 0 1024x768x24 >/dev/null 2>&1 9>&- &) ; sleep 1
 mkdir -p /tmp/xdg_bench; chmod 700 /tmp/xdg_bench
 export XDG_RUNTIME_DIR=/tmp/xdg_bench DISPLAY=:98 SDL_AUDIODRIVER=dummy LIBGL_ALWAYS_SOFTWARE=1 MESA_GL_VERSION_OVERRIDE=3.3 MESA_GLSL_VERSION_OVERRIDE=330
-(fs-uae $T/t.fs-uae >$OUT/fsuae.log 2>&1 &)
+(fs-uae $T/t.fs-uae >$OUT/fsuae.log 2>&1 9>&- &)
 sleep ${BOOT:-20}
 W=$(xdotool search --name "FS-UAE" | tail -1); xdotool windowfocus $W 2>/dev/null || true
 for s in $STEPS; do

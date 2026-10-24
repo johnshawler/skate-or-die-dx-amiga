@@ -121,7 +121,20 @@ static inline void WR8(u32 a, u8 v)
 #else
 #define M816_FASTBANKS 0xBDu
 #endif
-static __attribute__((noinline)) void WR16_slow(u32 a, u16 v) { WR8(a, (u8)v); WR8(a + 1, (u8)(v >> 8)); }
+static __attribute__((noinline)) void WR16_slow(u32 a, u16 v)
+{
+    u32 bk = (a >> 16) & 255; u16 o = (u16)a;
+#ifndef T816_AUX
+    if (o != 0xFFFF && o != 0x1FFF && o != 0x9FFF && (bk == 1 || bk == 0xE1)) {        /* the shadowed picture: bank 1 (mirrored into E1 unless shadowing is off) and E1 itself */
+        WLOG(a & 0xFFFFFF, (u8)v); WLOG((a & 0xFFFFFF) + 1, (u8)(v >> 8));
+        ST16(&BK[bk][o], v);
+        if (bk == 1) { if (o >= 0x2000 && o < 0xA000 && !(BE0[0xC035] & 8)) { ST16(&BE1[o], v); MARKE1_RANGE(o, 2); } }
+        else MARKE1_RANGE(o, 2);
+        return;
+    }
+#endif
+    WR8(a, (u8)v); WR8(a + 1, (u8)(v >> 8));
+}
 #ifdef T816_AUX
 static inline void WR16(u32 a, u16 v)
 #else
