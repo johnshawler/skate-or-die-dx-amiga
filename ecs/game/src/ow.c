@@ -158,6 +158,23 @@ static int run_event(Plat *P, Menu *M, int mode, u32 vbl_hz)
     return rc;
 }
 
+
+/* the shop after an event (or a whole competition): F39's start-up work (the high-score table) and Rodney's congratulation; a changed table is saved
+   (the original writes /sod/highs; here PROGDIR:data/highs.bin) */
+static void after_event(Plat *P, Menu *M)
+{
+    M->f70 = 0;
+    menu_after_event(M);
+    if (M->f70) {
+        u32 fh;
+        os_give();
+        fh = dos_Open("PROGDIR:data/highs.bin", 1006);
+        if (fh) { dos_Write(fh, M->scores, 192); dos_Close(fh); }
+        os_take(P);
+    }
+    if (M->compete_all) { M->compete_all = 0; menu_congrats(M); }
+}
+
 /* Entry point (first thing in the hunk): preserve the registers AmigaDOS may rely on, run the C code, return its result in d0. */
 __asm(".section .text.start,\"ax\"\n"
       ".globl start\n"
@@ -296,6 +313,7 @@ __attribute__((noinline)) int ow_main(void)
     MenuGfx gfx;
     gfx.ctx = P; gfx.glyph = p_glyph; gfx.picture = p_picture; gfx.palette = p_palette;
     M->rng0 = 0x5A; M->rng1 = 0xA5;
+
     M->f60 = 1;                                                 /* the game opens in Rodney's shop */
 
     Skater sk;
@@ -309,6 +327,11 @@ __attribute__((noinline)) int ow_main(void)
     if (!quit) {                                                /* the shop's song (Chip RAM: it is played by Paula) comes once the title's memory is free */
         music_stop(); os_give();
         ow_pcm = (const u8 *)asset_load("ow.raw", MEMF_CHIP, &base_size[7]);
+        {   /* the high scores saved by an earlier session (192 bytes); without the file the table starts empty as in the original's disk */
+            u32 hsz = 0; const u8 *hs = (const u8 *)asset_load("highs.bin", 0, &hsz);
+            if (hs) { if (hsz >= 192) for (i = 0; i < 192; i++) M->scores[i] = hs[i]; asset_free(hs, hsz); }
+            menu_hs_colours(M);
+        }
         os_take(P);
         ow_music_start(P);
     }
@@ -346,8 +369,7 @@ __attribute__((noinline)) int ow_main(void)
                 M->colour[2 * q] = (u8)(col[q] & 255); M->colour[2 * q + 1] = (u8)(col[q] >> 8); M->board[q] = (u8)(q + 1);
             }
             if (run_event(P, M, 1, (u32)vbl_hz) < 0) notice = 90;
-            map_mode = 0; menu_enter_shop(M);
-            if (M->compete_all) { M->compete_all = 0; menu_congrats(M); }
+            map_mode = 0; after_event(P, M);
             continue;
         }
         if ((keys[0x50] || keys[0x51] || keys[0x52] || keys[0x53] || keys[0x54]) && !(M->state == MS_NAME)) {    /* F1-F5: go straight to an event (testing) */
@@ -355,7 +377,7 @@ __attribute__((noinline)) int ow_main(void)
             keys[0x50] = keys[0x51] = keys[0x52] = keys[0x53] = keys[0x54] = 0;
             M->practice = 1; M->compete_all = 0;
             if (run_event(P, M, ev, (u32)vbl_hz) < 0) notice = 90;
-            map_mode = 0; menu_enter_shop(M);
+            map_mode = 0; after_event(P, M);
             continue;
         }
 
@@ -417,8 +439,7 @@ __attribute__((noinline)) int ow_main(void)
 #ifdef AUTOWALK
                             aw_n++;
 #endif
-                            map_mode = 0; menu_enter_shop(M);
-                            if (M->compete_all) { M->compete_all = 0; menu_congrats(M); }
+                            map_mode = 0; after_event(P, M);
                         }
                     } else {
                         P->comp = P->shown ^ 1;

@@ -52,6 +52,9 @@ typedef struct Menu {
     unsigned char colour[16];             /* $0768EE: eight little-endian words */
     unsigned char rng0, rng1;             /* $3078, $3079 */
     unsigned char congrats[36];           /* Rodney's last speech with the winner's name in its second row ($496C) */
+    unsigned char res_score[36];          /* $0768A8: the best three scores of each of the first four events of a competition (BCD, 3 bytes each) */
+    unsigned char res_ord[12];            /* $0768E2: the players who made them (their number in $0768DA's order) */
+    unsigned char ord[8];                 /* $0768DA: the order INTER sorted the players into */
     unsigned char totals[8];              /* $0768D2: the competition's points per player (BCD), for the winner of a competition in all events */
     unsigned char inter[6144];            /* INTER's variables and tables ($076800-$077FFF) while a competition moves from one event overlay to the next */
     int inter_valid;
@@ -443,6 +446,49 @@ static void cur_left(Menu *m)  { if (m->cx) m->cx--; }
 static void cur_right(Menu *m) { m->carry = m->cx >= 0x94; if (m->cx < 0x94) m->cx++; }
 
 /* Enter the shop through the door on the map ($351E) */
+/* ---- the high scores a competition changes: F39's start-up code at $1B5A ($1B9D, $1414, $1495, $1538) ---- */
+static void menu_hs_shift(Menu *m, int g, int a)                   /* $1538: entry g + a moves down one place */
+{
+    int x = (a + g) * 16, k;
+    for (k = 0; k < 16; k++) m->scores[x + 16 + k] = m->scores[x + k];
+}
+static void menu_hs_insert(Menu *m, int g, int r, int s)           /* $1495: the player's score s of this group goes in at place r */
+{
+    int y, x, k;
+    unsigned char p;
+    const unsigned char *res;
+    m->f70 = 1;                                                     /* the high scores are shown first */
+    if (r < 2) { menu_hs_shift(m, g, 1); if (r < 1) menu_hs_shift(m, g, 0); }
+    y = (r + g) * 16;
+    p = m->res_ord[s + g];
+    for (x = 7; x > 0; x--) if (m->ord[x] == p) break;
+    for (k = 0; k < 9; k++) m->scores[y + k] = m->names[x][k];
+    m->scores[y + 9] = 0;
+    res = m->res_score + (s + g) * 3;
+    m->scores[y + 10] = res[0]; m->scores[y + 11] = res[1]; m->scores[y + 12] = res[2];
+    m->scores[y + 15] = 0x44;                                       /* shown in its own colour once */
+}
+static void menu_hs_update(Menu *m)                                /* $1414: every new score of the competition against the table */
+{
+    int g;
+    if (!m->count) return;
+    for (g = 0; g < 12; g += 3) {
+        int r = 0, s = 0;
+        for (;;) {
+            const unsigned char *h = m->scores + (r + g) * 16 + 10, *v = m->res_score + (s + g) * 3;
+            unsigned long hs = (unsigned long)h[0] | ((unsigned long)h[1] << 8) | ((unsigned long)h[2] << 16);
+            unsigned long vs = (unsigned long)v[0] | ((unsigned long)v[1] << 8) | ((unsigned long)v[2] << 16);
+            if (hs < vs) { menu_hs_insert(m, g, r, s); if (++s >= 3) break; }
+            if (++r >= 3) break;
+        }
+    }
+}
+static void menu_hs_colours(Menu *m)                               /* $1B9D */
+{
+    int i;
+    for (i = 0; i < 12; i++) m->scores[i * 16 + 15] = 0x33;
+}
+
 /* back in the shop after a competition in all events ($139D): Rodney congratulates the player with the most points (a later player wins a tie) */
 static void menu_congrats(Menu *m)
 {
@@ -454,6 +500,14 @@ static void menu_congrats(Menu *m)
     m->f4bd3 = 1;
 }
 
+static void menu_enter_shop(Menu *m);
+/* what F39 does when it is loaded again after INTER ($1B5A): the shop, the high-score table brought up to date (and shown if something changed) */
+static void menu_after_event(Menu *m)
+{
+    menu_hs_colours(m);
+    menu_hs_update(m);
+    menu_enter_shop(m);
+}
 static void menu_enter_shop(Menu *m)
 {
     menu_clear_slots(m);

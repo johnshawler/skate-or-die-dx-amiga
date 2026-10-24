@@ -616,7 +616,15 @@ int ev_overlay_main(EvArgs *a)
 #endif
     for (i = 0; i < 192; i++) M->scores[i] = B7[0x7F00 + i];
     if (a->next) { for (i = 0; i < 6144; i++) M->inter[i] = B7[0x6800 + i]; M->inter_valid = 1; }
-    else { M->compete_all = LE16(&B7[0x68D0]); for (i = 0; i < 8; i++) M->totals[i] = B7[0x68D2 + i]; M->inter_valid = 0; }
+    else {                                                           /* over: what the shop (F39) takes over from INTER: the players (sorted by their results), the points, the best scores of the events */
+        M->compete_all = LE16(&B7[0x68D0]);
+        for (i = 0; i < 8; i++) { M->totals[i] = B7[0x68D2 + i]; M->ord[i] = B7[0x68DA + i]; M->board[i] = B7[0x68FE + i]; }
+        for (i = 0; i < 128; i++) ((u8 *)M->names)[i] = B7[0x6810 + i];
+        for (i = 0; i < 16; i++) M->colour[i] = B7[0x68EE + i];
+        for (i = 0; i < 36; i++) M->res_score[i] = B7[0x68A8 + i];
+        for (i = 0; i < 12; i++) M->res_ord[i] = B7[0x68E2 + i];
+        M->inter_valid = 0;
+    }
     io.enabled = 0;
     R16(DMACON) = 0x000F;                                            /* music and effects off */
     P->stream = 0;
