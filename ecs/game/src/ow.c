@@ -328,6 +328,13 @@ __attribute__((noinline)) int ow_main(void)
         if (M->state != MS_NAME && (keys[0x40] || keys[0x44])) fire = 1;
         if (keys[0x45] || (keys[0x10] && M->state != MS_NAME)) quit = 1;
 #ifdef DEBUG_KEYS
+        if (keys[0x59] && !(M->state == MS_NAME)) {                    /* F10: the shop after a competition (testing the winner's speech) */
+            keys[0x59] = 0;
+            M->count = 3; M->totals[0] = 3; M->totals[1] = 9; M->totals[2] = 5;
+            { int w; static const char nm[3][9] = {"ANNA", "BOB", "CHARLIE"}; int q; for (q = 0; q < 3; q++) for (w = 0; w < 16; w++) M->names[q][w] = w < 9 ? (u8)nm[q][w] : 0; }
+            map_mode = 0; menu_enter_shop(M); menu_congrats(M);
+            continue;
+        }
         if ((keys[0x56] || keys[0x57]) && !(M->state == MS_NAME)) {    /* F7 / F8: three skaters sign up and compete in the ramp / in all events (testing) */
             int q, w, all = keys[0x57];
             keys[0x56] = keys[0x57] = 0;

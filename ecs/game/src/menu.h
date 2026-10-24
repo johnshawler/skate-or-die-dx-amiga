@@ -458,6 +458,7 @@ static void menu_enter_shop(Menu *m)
 {
     menu_clear_slots(m);
     m->state = MS_SHOP_ENTER; m->cc = 0x0B; m->f60 = 1;
+    m->f4bcd = 0;                                                   /* the original loads the shop overlay afresh: Rodney speaks again */
 }
 
 /* One logic pass of states 1-9 in the order of the original main loop: pass counter, setup requests, Rodney's speech,
