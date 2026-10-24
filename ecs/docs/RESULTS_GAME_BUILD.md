@@ -1,6 +1,6 @@
 # Results of the game build (executable + data folder) on the 68020 / AGA / 2 MB Chip model
 
-Status: **performance target met for four of the five events; Joust holds its pace but with less than the 20% headroom (12% in the last full measurement; later changes raised it to about 16-18%, not re-measured with the final build).** The original's event/competition driver (INTER) now runs inside the game: practice-again prompt, turn-taking, results screens, competition in all events. Nothing here was run on a real Amiga.
+Status: **performance target met for four of the five events; Joust holds its pace but with 12% instead of 20% headroom on the mean (re-measured with the final build, including INTER: mean 54.7 ms of a 62.5 ms slot, median 50.6 ms = 19%, p95 57.2, 1.7% of passes over their slot; the earlier 16-18% figures were not from this metric).** The original's event/competition driver (INTER) now runs inside the game: practice-again prompt, turn-taking, results screens, competition in all events. Nothing here was run on a real Amiga.
 
 ## What exists (`ecs/game`, product in `ecs/game/dist` after `./build.sh`)
 * `SkateOrDie` (19.6 KB) + `data/` (7.0 MB: title/shop/map/score screens, font, skater sprites, ADPCM title song, shop song, per-event memory image `evN.pak`, per-event song `evN.raw`, effects `sfx.raw`, and the five event overlays `ramp/hj/race/jam/joust.ovl`). The program finds its data through `PROGDIR:data/`; the HDF (`tools/mkhdf.sh`) is only a carrier.
@@ -15,7 +15,7 @@ Work per pass = everything except the wait for the next slot (game code, picture
 | High Jump | 27 | 28.0 ms | 31.2 | 34.1 | **24%** | 0.5% | 27/27/27 | 325 KB |
 | Downhill Race | 11 | 57.1 ms | 56.7 | 83.3 | **37%** | 0.3% | 11/11/11 | 135 KB |
 | Downhill Jam | 10 | 75.5 ms | 100.8 | 117.1 | **25%** | 5.2% | 10/10/10 | 176 KB |
-| Pool Joust | 16 | 54.8 ms | 59.9 | 66.1 | **12% (short of 20%)** | 2.2% | 16/16/16 | 197 KB |
+| Pool Joust | 16 | 54.7 ms | 57.2 | 63.2 | **12% (short of 20%)** | 1.7% | 16/16/16 | 197 KB |
 A pass that runs over its slot is followed at once by the next one (no extra wait), so the average rate holds as long as the mean has headroom; the counters show the rate held for all five. The Jam's p95/p99 are above its slot (full-screen scrolling conversion); the worst single pass was 0.12 s (ramp, high jump), 0.5 s (race, jam: a scene load) and 2.2 s (Joust: a round change).
 Pace rates: ramp 29.3, high jump 26.7, race 11.1, jam 9.8 are the KEGS means of the source runs (`SOURCE_GATE.md`). **Joust:** the gate's 13.6-14.4/s is the mean over all event frames including the black round-load stretches; counting only one-second windows in which the original actually ran passes, its mean is about 16/s (one-second windows run 10-24/s, mostly 10-20). I paced Joust at 16. At 14/s the same measurement is 23% headroom; at 16/s it is 12%.
 Unpaced (maximum speed, same input): ramp 40/s, high jump 36/s, race 17/s, jam 13/s, joust 18/s.
