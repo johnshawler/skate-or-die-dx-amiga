@@ -14,7 +14,9 @@ m68k-linux-gnu-ld -T src/link.ld --emit-relocs -o $B/ow.elf $B/ow.o 2>&1 | grep 
 python3 -I tools/elf2hunk.py $B/ow.elf dist/SkateOrDie
 # the event overlays: translated game code + runtime + platform side, one hunk file each
 cfgs=(x ramp ev8 ev15 ev21 ev28); names=(x ramp hj race jam joust)
+INL="-finline-functions --param max-inline-insns-auto=150 --param inline-unit-growth=200 --param large-function-growth=300"   # worth 3% in the ramp, high jump and joust; the race and jam have no memory to spare for the larger code
 for n in 1 2 3 4 5; do
+  case $n in 1|2|5) EVOPT="$INL";; *) EVOPT=;; esac
   python3 -I tools/gen_ecs.py cfg/${cfgs[$n]}.json $B/ev$n.c 2>/dev/null
   $CC $FL $OVFL ${EVOPT:-} -Iruntime -I$T/runtime -Inative -I$T/native -Isrc -c $B/ev$n.c -o $B/ev$n.o
   EV=src/evrun.c

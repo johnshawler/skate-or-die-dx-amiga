@@ -76,6 +76,14 @@
    "0x4AD5": [
     "nat_dh_restore",
     "0x4B10"
+   ],
+   "0x39F0": [
+    "nat_fade_delay",
+    "0x39F9"
+   ],
+   "0x3A19": [
+    "nat_fade_delay",
+    "0x3A22"
    ]
   }
  }

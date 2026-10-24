@@ -30,6 +30,16 @@
    "0x2C83": "nat_glyph",
    "0x2588": "nat_remap",
    "0x44FC": "nat_joy"
+  },
+  "mid": {
+   "0x2DE5": [
+    "nat_fade_delay",
+    "0x2DEE"
+   ],
+   "0x2E0E": [
+    "nat_fade_delay",
+    "0x2E17"
+   ]
   }
  }
 }

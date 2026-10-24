@@ -76,4 +76,19 @@ done:
     return 1;
 }
 #endif
+
+/* ---- the palette fades (every overlay has two): between the steps the 65816 code counts X up to $6000 sixteen-plus times, about 79 ms a step on the 2.8 MHz IIGS
+ * (9 cycles an iteration). Running that loop as code takes the Amiga about twice as long and shows nothing, because the palette is only sent to the hardware once
+ * a pass. Here: show the palette as it is now and wait the same 79 ms; the loop's end state is X = $6000 and the flags of CPX (N 0, Z 1, C 1). ---- */
+#ifdef T816_AMIGA
+void rt_fade_wait(void);
+#else
+static inline void rt_fade_wait(void) {}
+#endif
+static int nat_fade_delay(void)
+{
+    rt_fade_wait();
+    cpu.x = 0x6000; cpu.n = 0; cpu.z = 1; cpu.c = 1;
+    return 1;
+}
 #endif

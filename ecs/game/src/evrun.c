@@ -164,6 +164,18 @@ u32 rt_jsl(u32 target)
     return 0;
 }
 
+/* a step of a palette fade (native.mid nat_fade_delay): the palette as it is now goes to the hardware, then the wait the original's counting loop makes (79 ms) */
+void rt_fade_wait(void)
+{
+    Plat *P = gP;
+    u16 pal[16]; int i, n;
+    if (P == (Plat *)1) return;
+    for (i = 0; i < 16; i++) pal[i] = LE16(BE1 + 0x9E00 + 2 * i);
+    set_palette(P, pal);
+    n = (ev_vbl * 79 + 500) / 1000;
+    for (i = 0; i < n; i++) frame_wait(P);
+}
+
 /* the game reads the keyboard with no key waiting both in its main loop (once or twice a pass) and in waits (pause, "press a key").
    Only a long run of reads without a pass in between is a wait: then keep the machine alive, a frame a read */
 static int poll_run = 0;
@@ -271,7 +283,14 @@ int rt_pass(u32 pc)
             u8 k = iigs_key(P->evq[P->evh]);
             P->evh = (P->evh + 1) & 15;
             if (k) { io.key = (u8)(k & 0x7F); io.key_waiting = 1; io.anykey = 1; }
+        } else {
+            /* the second player's controls in the two-player events: the digit keys 1-9 as directions (the numeric pad's layout, or the top row) and Shift as the button.
+               The original gets its repeat from the IIGS keyboard; here a held key is delivered once a pass */
+            static const u8 pad[10] = {0x0F, 0x1D, 0x1E, 0x1F, 0x2D, 0x2E, 0x2F, 0x3D, 0x3E, 0x3F};
+            int d;
+            for (d = 1; d <= 9; d++) if (keys[d] || keys[pad[d]]) { io.key = (u8)(0x30 + d); io.key_waiting = 1; io.anykey = 1; break; }
         }
+        io.mods = (keys[0x60] || keys[0x61]) ? 1 : 0;
     }
     return 0;
 }

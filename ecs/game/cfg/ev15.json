@@ -78,6 +78,14 @@
    "0x4644": [
     "nat_dh_restore",
     "0x467F"
+   ],
+   "0x3561": [
+    "nat_fade_delay",
+    "0x356A"
+   ],
+   "0x358A": [
+    "nat_fade_delay",
+    "0x3593"
    ]
   }
  }

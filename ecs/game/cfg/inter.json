@@ -1,0 +1,19 @@
+{
+ "file": "../../ecs/game/assets/inter.bin",
+ "base": 26624,
+ "bank": 7,
+ "entry": 26925,
+ "db": 7,
+ "extra_entries": [
+  30072,
+  26888,
+  31431,
+  31446
+ ],
+ "native": {},
+ "extra_db": 7,
+ "replace": {
+  "0x73B4": "inter_prodos",
+  "0x6F7C": "inter_scenes"
+ }
+}
