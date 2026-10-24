@@ -14,7 +14,7 @@ echo "## Product (dist/)"
 echo '```'
 (cd dist && sha256sum SkateOrDie $(ls data | sed 's#^#data/#'))
 echo '```'
-for f in "$@"; do echo; echo "## $f"; echo '```'; sha256sum "$f"; echo '```'; done
+for f in "$@"; do echo; echo "## $(basename "$f") (packaged from dist/; archive and HDF bytes contain timestamps, so their hashes change with every packaging run)"; echo '```'; (cd "$(dirname "$f")" && sha256sum "$(basename "$f")"); echo '```'; done
 echo
 echo "## Tools"
 echo '```'
@@ -27,7 +27,7 @@ echo '```'
 echo
 echo "## Firmware the product needs to run (not included in dist/)"
 echo '```'
-sha256sum "$ROOT"/roms/Kickstart*A1200*.rom
+(cd "$ROOT/roms" && sha256sum Kickstart*A1200*.rom)
 echo '```'
 } > "$OUT"
 echo "wrote $OUT"
