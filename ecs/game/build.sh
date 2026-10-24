@@ -5,7 +5,7 @@
 set -e
 cd "$(dirname "$0")"
 ROOT=../..; T=$ROOT/tools/t816; CC=m68k-linux-gnu-gcc; B=build; mkdir -p $B dist/data
-FL="-m68020 -O2 -ffixed-a6 -fomit-frame-pointer -ffreestanding -fno-builtin -fno-pic -fno-strict-aliasing -fno-stack-protector -fno-asynchronous-unwind-tables -nostdlib -DT816_AMIGA $EXTRA"
+FL="-m68020 -O2 -ffixed-a6 -fomit-frame-pointer -ffreestanding -fno-builtin -fno-pic -fno-strict-aliasing -fno-stack-protector -fno-asynchronous-unwind-tables -nostdlib -DT816_AMIGA ${SMALLLUT:--DC2P_BIGLUT} $EXTRA"
 [ -f dist/data/ow.raw ] || python3 -I tools/make_data.py $ROOT/demo/assets dist/data
 # the program
 $CC $FL -Os -c src/ow.c -o $B/ow.o -Isrc

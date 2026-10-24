@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the 68020 chunky-to-planar row kernels (src/c2p.h) in Unicorn on random pictures and compare with a plain reference.  usage: c2ptest.py [rounds] [-DC2P_NOPAIR]"""
+"""Run the 68020 chunky-to-planar row kernels (src/c2p.h) in Unicorn on random pictures and compare with a plain reference.  usage: c2ptest.py [rounds] [-DC2P_PAIR]"""
 import sys, os, subprocess, struct, random
 from unicorn import *
 from unicorn.m68k_const import *

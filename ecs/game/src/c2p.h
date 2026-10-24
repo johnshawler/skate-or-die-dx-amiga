@@ -126,8 +126,8 @@ static void c2p_row_one(const u32 *tab, const u8 *s, u8 *d, u8 *h, int n, int fo
             : [t0] "a"(tab) : "memory", "cc");
     }
 }
-#ifndef C2P_NOPAIR
-/* Two groups (16 pixels) at a time, writing a word to each plane instead of two bytes: the two lookups' plane bytes (a0 a1 a2 a3, b0 b1 b2 b3) are
+#ifdef C2P_PAIR
+/* (measured on the A1200 model: slower than one group at a time - the loop no longer fits the 68020's 256-byte instruction cache - so it is off) Two groups (16 pixels) at a time, writing a word to each plane instead of two bytes: the two lookups' plane bytes (a0 a1 a2 a3, b0 b1 b2 b3) are
    interleaved into the words a0b0 a1b1 a2b2 a3b3. The shadow copy sits at a constant distance from the picture, so it is addressed with an index register
    (no register for a second pointer). d must be even. */
 #define C2P_INTERLEAVE \
@@ -170,7 +170,7 @@ static void c2p_row_pairs(const u32 *tab, const u8 *s, u8 *d, u8 *h, int npairs,
 /* the groups g0..g0+n-1 of a row: `s`, `d`, `h` point at group g0 of the chunky picture, the planes and the shadow copy */
 static void c2p_row(const u32 *tab, const u8 *s, u8 *d, u8 *h, int g0, int n, int force)
 {
-#ifndef C2P_NOPAIR
+#ifdef C2P_PAIR
     if (g0 & 1) { c2p_row_one(tab, s, d, h, 1, force); s += 4; d += 1; h += 4; n--; }
     if (n >= 2) { int np = n >> 1; c2p_row_pairs(tab, s, d, h, np, force); s += 8 * np; d += 2 * np; h += 8 * np; n -= 2 * np; }
     if (n) c2p_row_one(tab, s, d, h, n, force);
