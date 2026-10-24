@@ -35,6 +35,7 @@ typedef struct Menu {
     unsigned short f60, f62, f64, f66, f68, f6e, f70;   /* screen-setup requests handled at the start of the next pass */
     unsigned short exit_code;             /* $6C */
     unsigned short practice;              /* $077E17 */
+    unsigned short compete_all;           /* $0768D0: the competition goes through all five events */
     unsigned short key;                   /* $3064: translated key for the name entry */
     /* the glyph "pen" ($3044 x in bytes, $3046 y in pixels, $2E colour mask) and the text cursor ($303E col, $3040 row) */
     unsigned short gx, gy, mask, tcol, trow;
@@ -50,6 +51,11 @@ typedef struct Menu {
     unsigned char board[8];               /* $0768FE */
     unsigned char colour[16];             /* $0768EE: eight little-endian words */
     unsigned char rng0, rng1;             /* $3078, $3079 */
+    unsigned char congrats[36];           /* Rodney's last speech with the winner's name in its second row ($496C) */
+    unsigned char totals[8];              /* $0768D2: the competition's points per player (BCD), for the winner of a competition in all events */
+    unsigned char inter[6144];            /* INTER's variables and tables ($076800-$077FFF) while a competition moves from one event overlay to the next */
+    int inter_valid;
+    unsigned char font[3072];             /* a copy of the font for INTER's text screens (the overlays are loaded while the shop's files are freed) */
     int carry;                            /* 6502 carry flag as left by the code before $3CDA (only the sign's flashing depends on it) */
     unsigned short palette_blink;         /* number of the palette change requested this pass (see menu_blink) */
 } Menu;
@@ -258,7 +264,8 @@ static void menu_speech(Menu *m, const MenuGfx *g)
     if (x == 0x0B) x = 0x0B + (menu_rand(m) & 7);
     m->tcol = 5; m->trow = 6;
     for (row = 0; row < 4; row++) {
-        for (i = 0; i < 9; i++) menu_tglyph(m, g, menu_speech_txt[x][row * 9 + i]);
+        const unsigned char *t = x == 0x14 ? m->congrats : menu_speech_txt[x];
+        for (i = 0; i < 9; i++) menu_tglyph(m, g, t[row * 9 + i]);
         m->tcol = 5; m->trow++;
     }
 }
@@ -436,6 +443,17 @@ static void cur_left(Menu *m)  { if (m->cx) m->cx--; }
 static void cur_right(Menu *m) { m->carry = m->cx >= 0x94; if (m->cx < 0x94) m->cx++; }
 
 /* Enter the shop through the door on the map ($351E) */
+/* back in the shop after a competition in all events ($139D): Rodney congratulates the player with the most points (a later player wins a tie) */
+static void menu_congrats(Menu *m)
+{
+    int best = 0, x, k;
+    unsigned hi = 0;
+    for (x = 0; x < m->count && x < 8; x++) if (m->totals[x] >= hi) { hi = m->totals[x]; best = x; }
+    for (k = 0; k < 36; k++) m->congrats[k] = menu_speech_txt[0x14][k];
+    for (k = 0; k < 9; k++) { unsigned char c = m->names[best][k]; m->congrats[9 + k] = c ? c : 32; }
+    m->f4bd3 = 1;
+}
+
 static void menu_enter_shop(Menu *m)
 {
     menu_clear_slots(m);

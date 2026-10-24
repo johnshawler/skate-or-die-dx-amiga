@@ -24,9 +24,13 @@ void io_poll(void)
     if (test_ki < test_nkeys) { io.key = test_keys[test_ki++]; io.key_waiting = 1; io.anykey = 1; }
     else { io.key = 0x20; io.key_waiting = 1; io.anykey = 1; }
 }
+void rt_inter_wait(void)                     /* the timed wait: the oracle test supplies the next key at its first poll */
+{
+    io_poll();
+}
 ''')
 inc = [f'-I{G}/runtime', f'-I{T}/runtime', f'-I{G}/native']
-subprocess.check_call(['gcc', '-O1', '-fPIC', '-c', '-Dio_poll=io_poll_default'] + inc + ['-o', W + '/rt.o', f'{T}/runtime/m816rt.c'])
+subprocess.check_call(['gcc', '-O1', '-fPIC', '-c', '-Dio_poll=io_poll_default'] + inc + ['-o', W + '/rt.o', f'{G}/runtime/m816rt.c'])
 subprocess.check_call(['gcc', '-O1', '-fPIC', '-c'] + inc + ['-o', W + '/inter.o', W + '/inter.c'])
 subprocess.check_call(['gcc', '-O1', '-fPIC', '-c'] + inc + ['-o', W + '/stubs.o', W + '/stubs.c'])
 subprocess.check_call(['gcc', '-shared', '-o', W + '/lib.so', W + '/inter.o', W + '/stubs.o', W + '/rt.o'])
@@ -144,3 +148,7 @@ if os.environ.get('SHOWALL'):
     def pg(b): return '\n'.join(''.join(chr((c & 0x7F) if (c & 0x7F) >= 0x20 else 0x2E) if c else ' ' for c in b[r:r + 40]) for r in rows).rstrip()
     for nm, sn in (('oracle', osnaps), ('translated', tsnaps)):
         for i, s in enumerate(sn): print('=== %s wait %d' % (nm, i)); print(pg(s))
+if os.environ.get('CHARS'):
+    s = set()
+    for sn in osnaps: s |= set(b for b in sn)
+    print('CHARS', ' '.join('%02X' % c for c in sorted(s)))

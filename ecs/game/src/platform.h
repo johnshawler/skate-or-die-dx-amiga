@@ -257,6 +257,8 @@ typedef struct EvArgs {
     u32 vbl_hz;
     int mode;
     int rc;
+    const u8 *font;                                          /* the shop's font (menu.fnt): INTER's text screens */
+    int next;                                               /* out: the competition goes on in this event's overlay (state in Menu.inter); 0 = finished */
     int run, esc;                                           /* test builds: which run of a looped event this is; the player pressed ESC */
 } EvArgs;
 

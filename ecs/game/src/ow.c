@@ -130,17 +130,22 @@ static int run_event(Plat *P, Menu *M, int mode, u32 vbl_hz)
     u32 seg;
     int rc;
     music_stop(); R16(DMACON) = 0x000F; P->stream = 0;
+    { int i; for (i = 0; i < 3072; i++) M->font[i] = menu_fnt[i]; }
     os_give();
     ow_free_base();
     a.P = P; a.M = M; a.SysBase = SysBase; a.DOSBase = DOSBase; a.oldint = g_oldint; a.clock = g_clock; a.vbl_hz = vbl_hz; a.mode = mode; a.rc = -1; a.run = 0; a.esc = 0;
+    a.font = M->font; a.next = 0; M->inter_valid = 0;
     seg = 0;
 #ifdef BENCH_LOOP
     for (;;) {                                                  /* test builds: play the event again and again until ESC (each run writes its own timing file) */
 #endif
-    seg = dos_LoadSeg(ovl[mode]);
-    if (seg) {
+    for (;;) {                                                  /* a competition in all events goes on in the next event's overlay: INTER's state travels in the Menu */
+        seg = dos_LoadSeg(ovl[a.mode]);
+        if (!seg) break;
         ((int (*)(EvArgs *))((seg << 2) + 4))(&a);
         dos_UnLoadSeg(seg);
+        if (a.rc < 0 || !a.next) break;
+        a.mode = a.next; a.next = 0;
     }
 #ifdef BENCH_LOOP
     if (!seg || a.esc || ++a.run >= 24) break;
@@ -323,10 +328,25 @@ __attribute__((noinline)) int ow_main(void)
         if (M->state != MS_NAME && (keys[0x40] || keys[0x44])) fire = 1;
         if (keys[0x45] || (keys[0x10] && M->state != MS_NAME)) quit = 1;
 #ifdef DEBUG_KEYS
+        if ((keys[0x56] || keys[0x57]) && !(M->state == MS_NAME)) {    /* F7 / F8: three skaters sign up and compete in the ramp / in all events (testing) */
+            int q, w, all = keys[0x57];
+            keys[0x56] = keys[0x57] = 0;
+            M->count = 3; M->practice = 0; M->compete_all = (unsigned short)all;
+            for (q = 0; q < 3; q++) {
+                static const char nm[3][9] = {"ANNA", "BOB", "CHARLIE"};
+                static const u16 col[3] = {0x0F00, 0x00F0, 0x000F};
+                for (w = 0; w < 16; w++) M->names[q][w] = w < 9 ? (u8)nm[q][w] : 0;
+                M->colour[2 * q] = (u8)(col[q] & 255); M->colour[2 * q + 1] = (u8)(col[q] >> 8); M->board[q] = (u8)(q + 1);
+            }
+            if (run_event(P, M, 1, (u32)vbl_hz) < 0) notice = 90;
+            map_mode = 0; menu_enter_shop(M);
+            if (M->compete_all) { M->compete_all = 0; menu_congrats(M); }
+            continue;
+        }
         if ((keys[0x50] || keys[0x51] || keys[0x52] || keys[0x53] || keys[0x54]) && !(M->state == MS_NAME)) {    /* F1-F5: go straight to an event (testing) */
             int ev = keys[0x50] ? 1 : keys[0x51] ? 2 : keys[0x52] ? 3 : keys[0x53] ? 4 : 5;
             keys[0x50] = keys[0x51] = keys[0x52] = keys[0x53] = keys[0x54] = 0;
-            M->practice = 1;
+            M->practice = 1; M->compete_all = 0;
             if (run_event(P, M, ev, (u32)vbl_hz) < 0) notice = 90;
             map_mode = 0; menu_enter_shop(M);
             continue;
@@ -384,13 +404,14 @@ __attribute__((noinline)) int ow_main(void)
                     M->exit_code = (unsigned short)sk.exit_code;
                     if (M->count || M->practice) {
                         int code = sk.exit_code;
-                        M->exit_code = 0; sk_reset(&sk);
+                        M->exit_code = 0; M->compete_all = (unsigned short)(sk.compete_all && !M->practice); sk_reset(&sk);
                         if (code >= 1 && code <= 5) {           /* freestyle ramp, high jump, downhill race, downhill jam, pool joust */
                             if (run_event(P, M, code, (u32)vbl_hz) < 0) notice = 90;
 #ifdef AUTOWALK
                             aw_n++;
 #endif
                             map_mode = 0; menu_enter_shop(M);
+                            if (M->compete_all) { M->compete_all = 0; menu_congrats(M); }
                         }
                     } else {
                         P->comp = P->shown ^ 1;

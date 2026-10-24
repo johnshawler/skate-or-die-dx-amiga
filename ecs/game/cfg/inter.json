@@ -10,7 +10,17 @@
   31431,
   31446
  ],
- "native": {},
+ "native": {
+  "consts": "inter_stubs.h",
+  "header": "inter_nat.h",
+  "fast": {},
+  "mid": {
+   "0x7755": [
+    "nat_inter_wait",
+    "0x777B"
+   ]
+  }
+ },
  "extra_db": 7,
  "replace": {
   "0x73B4": "inter_prodos",

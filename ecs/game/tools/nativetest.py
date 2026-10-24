@@ -17,7 +17,7 @@ cfg = json.load(open(f'{G}/cfg/{cfgn}.json'))
 hooks = [0x030000 | int(cfg['pass_hook'], 0)] + [0x030000 | int(h, 0) for h in cfg.get('extra_pass_hooks', [])]
 src = f'/tmp/ntg_{cfgn}_{fn}.c'; lib = f'/tmp/ntg_{cfgn}_{fn}.so'
 open(src, 'w').write('#include "m816.h"\n#include "%s"\n#include "%s/native/%s"\nu32 dispatch_call(u16 a) { (void)a; return 0; }\nint t_run(void) { return %s(); }\n' % (os.path.abspath(hdr), G, os.environ.get('NAT_H', 'engine.h'), fn))
-subprocess.check_call(['gcc', '-O1', '-shared', '-fPIC', f'-I{G}/runtime', f'-I{here}/runtime', f'-I{G}/native', '-o', lib, src, f'{here}/runtime/m816rt.c'])
+subprocess.check_call(['gcc', '-O1', '-shared', '-fPIC', f'-I{G}/runtime', f'-I{here}/runtime', f'-I{G}/native', '-o', lib, src, f'{G}/runtime/m816rt.c'])
 rt = ctypes.CDLL(lib)
 rt.rt_bank_ptr.restype = ctypes.POINTER(ctypes.c_uint8 * 65536); rt.rt_cpu.restype = ctypes.c_void_p; rt.rt_dmin_ptr.restype = ctypes.POINTER(ctypes.c_uint8 * 200)
 class Cpu(ctypes.Structure): _fields_ = [('a', ctypes.c_uint16), ('x', ctypes.c_uint16), ('y', ctypes.c_uint16), ('s', ctypes.c_uint16), ('d', ctypes.c_uint16), ('db', ctypes.c_uint8), ('n', ctypes.c_uint8), ('v', ctypes.c_uint8), ('z', ctypes.c_uint8), ('c', ctypes.c_uint8), ('i', ctypes.c_uint8)]

@@ -14,7 +14,7 @@ STEP = [7,8,9,10,11,12,13,14,16,17,19,21,23,25,28,31,34,37,41,45,50,55,60,66,73,
 INDEX = [-1, -1, -1, -1, 2, 4, 6, 8]
 BLK = 1024
 # page spans per bank (first, last page): the union of what the four events touched in the 65816 oracle runs (tools/cpu816x/workingset.py), plus margins
-SPANS = {0x00: (0, 3), 0x01: (0x1E, 0xA1), 0x02: (0, 0xFF), 0x03: (0, 0x6A), 0x04: (0, 0xFF), 0x05: (0, 0xF5), 0x07: (0, 0x7F), 0xE0: (0x0E, 0xC2), 0xE1: (0x1E, 0xC2)}
+SPANS = {0x00: (0, 3), 0x01: (0x1E, 0xA1), 0x02: (0, 0xFF), 0x03: (0, 0x6A), 0x04: (0, 0xFF), 0x05: (0, 0xF5), 0x07: (0, 0x7F), 0xE0: (0x04, 0xC2), 0xE1: (0x1E, 0xC2)}
 
 def encode_block(blk, pred, idx):
     out = bytearray(struct.pack('<hBB', pred, idx, 0)); nib = []
@@ -66,6 +66,8 @@ def trim_pak(path, outp):
 
 for f in ('map.scr', 'shop.scr', 'list.scr', 'scores.scr', 'board.scr', 'title.scr', 'menu.fnt', 'skater.spr', 'title.ima'):
     shutil.copy(f'{src}/{f}', f'{out}/{f}')
+# INTER (the event and competition driver, bank 7 $6800-$7FFF) as the original has it before it first runs; the code is translated into the overlays, the data are read from here
+shutil.copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'assets', 'inter.bin'), f'{out}/inter.bin')
 # the events only ask for effects $09-$0E (tools/cpu816x/sfxuse.py: the calls of the sound driver in long oracle runs): the first 96,872 bytes of sfx.raw
 open(f'{out}/sfx.raw', 'wb').write(open(f'{src}/sfx.raw', 'rb').read()[:96872])
 
