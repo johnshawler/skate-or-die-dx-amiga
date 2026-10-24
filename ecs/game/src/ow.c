@@ -101,6 +101,35 @@ static void p_palette(void *ctx, const u16 *pal)
     set_palette((Plat *)ctx, pal);
 }
 
+/* ---- the overworld's own animations (state 0 of F39: $1061 and $10F0): every 16 passes colour 10 (the light on the shop) changes between $0D0D and $0FF0,
+   every 4 passes the next of four frames of the pond's water (32 x 26 pixels, bottom left) is copied into the picture ---- */
+#include "water.h"
+static int map_water_frame;
+static void map_draw_water(Plat *P, int frame)
+{
+    const u8 *src = map_water + frame * 416;
+    int r, g, k;
+    for (r = 0; r < 26; r++) {
+        u8 *row = P->L + (174 + r) * 160;
+        for (g = 0; g < 4; g++) {                                   /* 8 pixels = one byte of each bitplane */
+            u8 pl[4] = {0, 0, 0, 0};
+            for (k = 0; k < 8; k++) {
+                u8 v = src[r * 16 + g * 4 + (k >> 1)];
+                u8 c = (k & 1) ? (u8)(v & 15) : (u8)(v >> 4);
+                pl[0] = (u8)((pl[0] << 1) | (c & 1)); pl[1] = (u8)((pl[1] << 1) | ((c >> 1) & 1));
+                pl[2] = (u8)((pl[2] << 1) | ((c >> 2) & 1)); pl[3] = (u8)((pl[3] << 1) | ((c >> 3) & 1));
+            }
+            row[g] = pl[0]; row[40 + g] = pl[1]; row[80 + g] = pl[2]; row[120 + g] = pl[3];
+        }
+    }
+}
+static void map_animate(Plat *P, Menu *M)
+{
+    M->pass++;                                                      /* F39 counts every pass, also on the map */
+    if ((M->pass & 15) == 0) { M->pal[10] = M->pal[10] == 0x0D0D ? 0x0FF0 : 0x0D0D; set_palette(P, M->pal); }
+    if ((M->pass & 3) == 0) { map_water_frame = (map_water_frame + 1) & 3; map_draw_water(P, map_water_frame); }
+}
+
 /* ---- the files the shop and the map need (screens, font, skater sprites, the overworld song): loaded with AmigaDOS running ---- */
 static const char *const base_names[8] = {"map.scr", "shop.scr", "list.scr", "board.scr", "scores.scr", "menu.fnt", "skater.spr", "ow.raw"};
 static const u8 **const base_ptr[8] = {&pictures[0], &pictures[1], &pictures[2], &pictures[3], &pictures[4], &menu_fnt, &skater_spr, &ow_pcm};
@@ -394,6 +423,11 @@ __attribute__((noinline)) int ow_main(void)
         if (M->state != MS_NAME && (keys[0x40] || keys[0x44])) fire = 1;
         if (keys[0x45] || (keys[0x10] && M->state != MS_NAME)) quit = 1;
 #ifdef DEBUG_KEYS
+        if (keys[0x42] && !(M->state == MS_NAME)) {                    /* Tab (testing): out onto the map */
+            keys[0x42] = 0; M->practice = 1; M->state = MS_MAP; menu_clear_slots(M); menu_show(M, &gfx, PIC_MAP);
+            map_mode = 1; sk_reset(&sk);
+            continue;
+        }
         if (keys[0x5F] && !(M->state == MS_NAME)) {                    /* Help (testing): the High Scores screen */
             keys[0x5F] = 0; map_mode = 0; menu_enter_shop(M); M->f70 = 1;
             continue;
@@ -488,6 +522,7 @@ __attribute__((noinline)) int ow_main(void)
                 ctl = aw_i < aw_len[aw_n % 5] ? aw_seq[aw_n % 5][aw_i++] : 0xFF;
 #endif
                 sk_step(&sk, ctl);
+                if (map_mode && M->state == MS_MAP) map_animate(P, M);
                 if (sk.in_shop) {                               /* the shop door: back to Rodney */
                     sk_reset(&sk); map_mode = 0; menu_enter_shop(M);
                 } else if (sk.exit_code) {

@@ -47,6 +47,7 @@ All five hold their pace (on-screen counter 29/27/11/10/16, lowest equal to aver
 ## 5. Acceptance gate (brief section 5)
 | Requirement | Result | Evidence |
 |---|---|---|
+| Overworld map animation | Rodney's neon sign alternates colour every 16 map passes and the fountain/pond redraws one of four frames every 4 passes (F39's code, resource F35); checked in FS-UAE screenshots (sign magenta/yellow, pond image changes), not against a KEGS capture | |
 | Cold-boots from a clean launch into the playable game | yes (boot HDF, `S:Startup-Sequence` runs `SYS:SkateOrDie`; title, then the shop) | FS-UAE runs of the product HDF |
 | Independent of development paths, services, test scripts | yes: `PROGDIR:data/`; test keys, timing and stress input are build options (`DEBUG_KEYS`, `BENCH_*`, `TIMING`) that `build.sh` leaves off | `build.sh` |
 | Sustained heavy play across the corpus | 240 s per event paced, 9 minutes of practice in the race and jam, 40+ minutes in a competition race, no failure | `RESULTS_GAME_BUILD.md`, section 6 |
@@ -59,16 +60,17 @@ All five hold their pace (on-screen counter 29/27/11/10/16, lowest equal to aver
 | Case | Input | Result |
 |---|---|---|
 | Ramp, high jump, joust, practice | synthetic stress input (waggle) | each ends by itself (ramp and high jump about 35 s, joust about a minute) and returns to the shop |
-| Downhill race and jam, practice | synthetic input | **do not end by themselves** (9 minutes: race clock 9:14, jam 8:46-9:26); ESC leaves; the original's code agrees (`SOURCE_GATE.md`) |
+| Downhill race and jam, practice | synthetic input | **do not end by themselves** (9 minutes: race clock 9:14, jam 8:46-9:26): the synthetic input never reaches the finish; ESC leaves |
+| **Downhill race to its finish, real play** | **your save state** (`Saved_State_1.uss`, FS-UAE, restored here) | a practice race ended at the FINISH line (clock stopped at 1:55:2, score 2909 + bonus 100 = 3009); the skater stands; **a key press** gives "PRACTICE AGAIN? YES NO" and YES restarts the race. The race ends by itself in the original's code; what was missing was a run that reached the finish. Not yet seen: the same ending inside a competition (results screen after it) |
 | Three-player competition in all events, each event ended by a test key (F6) with pseudo-random scores | test build | ramp, high jump, downhill, jam (pairs), joust (win/loss) with a results screen after each, high scores updated, congratulation, back to the shop |
-| Three-player competition in all events from synthetic play | test build, stress input plus Return | ramp (3 skaters) and high jump play through by themselves; **the downhill race never ended in 40+ minutes of emulator time** (its clock stops at 9:59:9 and the race goes on), so this run did not get past it. A steering bot on the original machine drove the race to its cliff jump ("DANGER" sign), crashed, and the race did not end from there either; I did not find the race's normal end condition |
+| Three-player competition in all events from synthetic play | test build, stress input plus Return | ramp (3 skaters) and high jump play through by themselves; **the downhill race never ended in 40+ minutes of emulator time** (its clock stops at 9:59:9 and the race goes on), so this run did not get past it. A steering bot on the original machine drove the race to its cliff jump ("DANGER" sign), crashed, and the race did not end from there either; I did not find the race's normal end condition at the time; your save state later showed it (the FINISH line) |
 | Pool joust competition, three players | stress input, Shift as the second player's button | **played to its end from synthetic input** (about 14 minutes of emulator time): bout ANNA vs BOB, then CHARLIE vs ANNA, then the results and back to the shop; two-player controls work (without Shift the second skater's "PRESS YOUR BUTTON" never completes) |
 | High-score persistence | two separate emulator sessions on one HDF | session 1 wrote `data/highs.bin`; session 2 loaded it: BOB 6999, CHARLIE 3347, ANNA 954 |
 | Practice prompt, ESC | test build | YES restarts, NO / `n` returns; ESC in an event or results screen returns to the shop |
 
 ## 7. Known gaps and decisions needed
 1. **Joust headroom 12% on the mean** (median 19%): below the 20% contract. More optimisation is possible but not guaranteed to reach 20%; or accept 12%.
-2. **Race and jam endings:** a race finished by real play, and the jam's time limit, were not exercised on the original (`SOURCE_GATE.md`) or on the Amiga; the competition through the downhill events was run only with a test key ending each one.
+2. **Race and jam endings:** the race's natural ending is now seen (your save state, section 6) in practice mode; the race inside a competition, and the jam's end (time limit or finish), were run only with a test key (F6) ending each one, not by reaching their natural end.
 3. **No independent screenshot comparison** against the KEGS captures (section 3).
 4. **No real hardware**, no Fast RAM test, 14.19 MHz assumed, FS-UAE timing is a model.
 5. **Final milestone** (section 1) to be confirmed.
