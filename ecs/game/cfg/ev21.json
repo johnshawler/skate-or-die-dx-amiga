@@ -67,7 +67,8 @@
    "0x3B03": "nat_bgfill",
    "0x532C": "nat_joy",
    "0x383F": "nat_glyph_jam",
-   "0x25B9": "nat_step_pos"
+   "0x25B9": "nat_step_pos",
+   "0x483A": "nat_tile"
   },
   "mid": {
    "0x4A04": [

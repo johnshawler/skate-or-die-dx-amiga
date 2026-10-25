@@ -189,6 +189,42 @@ static int nat_step_pos(void)
 }
 #endif
 
+#ifdef N_TILE
+/* $483A (jam): draw the 8x8 tile A (32 bytes: 8 rows of 4) of the scenery at the strip position given by the column ($644A, bytes) and the row ($644C, row table in bank 4 at $DE00)
+ * into bank 2, twice (the strip is kept twice, $6E00 bytes apart), then step the column by 4 and, at 160, the row by 16 (at $190 back to 0). The tile graphics are read through the
+ * long pointer at direct page $4A. PHX PHY PHA ... PLA PLY PLX: the stack bytes stay, the registers come back, N and Z follow X, C and V those of the last compare and add. */
+static int nat_tile(void)
+{
+    u16 A = cpu.a, X = cpu.x, Y = cpu.y, S = cpu.s, ya, xa, i, col = G3(0x644A), row = G3(0x644C);
+    u8 N = 0, V = 0, Z = 0, C = 0;
+    u32 ptr = (u32)B0[0x4A] | ((u32)B0[0x4B] << 8) | ((u32)B0[0x4C] << 16);
+    const u8 *src;
+    u16 rt;
+    if (cpu.d != 0 || (u32)0xDE00 + row + 2 > 0xFFF0) return 0;
+    ya = (u16)(A << 5);
+    if (!dh_src(ptr, ya, 32, &src)) return 0;
+    rt = LE16(B4 + 0xDE00 + row);
+    xa = (u16)(rt + col);
+    if ((u32)xa + 0x6E00UL + 160UL * 7 + 4 > 0xFFF0) return 0;
+    for (i = 0; i < 8; i++) {
+        u16 w0 = LE16(src + 4 * i), w1 = LE16(src + 4 * i + 2), at = (u16)(xa + 160 * i);
+        ST16(B2 + at, w0); ST16(B2 + at + 0x6E00, w0); ST16(B2 + at + 2, w1); ST16(B2 + at + 2 + 0x6E00, w1);
+        B2M(at, 4); B2M((u16)(at + 0x6E00), 4);
+    }
+    S3(0x18, 0);
+    A = col; C = 0; ADC16(4); S3(0x644A, A); CMP16(A, 0xA0);
+    if (C) {
+        S3(0x644A, 0);
+        A = row; C = 0; ADC16(0x10); S3(0x644C, A); CMP16(A, 0x190);
+        if (C) S3(0x644C, 0);
+    }
+    B0[S] = (u8)(X >> 8); B0[(u16)(S - 1)] = (u8)X; B0[(u16)(S - 2)] = (u8)(Y >> 8); B0[(u16)(S - 3)] = (u8)Y; B0[(u16)(S - 4)] = (u8)(cpu.a >> 8); B0[(u16)(S - 5)] = (u8)cpu.a;
+    SETNZ16(X);                                                  /* PLX is the last instruction that sets N and Z */
+    cpu.n = N; cpu.z = Z; cpu.v = V; cpu.c = C;                  /* (A, X and Y: unchanged) */
+    return 1;
+}
+#endif
+
 /* ---- 383F (jam): draw the 8x8 character in A at the text cursor (columns at $6470, rows at $6472 of bank 3) straight into bank E1 and move the cursor on ---- */
 #ifdef N_JGLYPH
 #ifndef N_JG_COL
