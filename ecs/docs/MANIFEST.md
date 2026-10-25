@@ -1,10 +1,10 @@
 # Artifact manifest
 
-Generated 2026-10-25T01:03:05Z from commit `ea18dee9822ad45b40adc40f89e4aab86aab6398` (working tree: 0 modified/untracked paths under ecs/game).
+Generated 2026-10-25T13:16:41Z from commit `876b9f294c8d40c40cb99ed4730474687e419771` (working tree: 0 modified/untracked paths under ecs/game).
 
 ## Product (dist/)
 ```
-175ad3f289e6900907405ee93431d0ac3e3c69edfe86a95c2ccdc212388a05ff  SkateOrDie
+11429682cce0a10b164e03bf489ad156232ad8e811e0ef97a0c5531ceb3ff35a  SkateOrDie
 f719e7790ba596c9e5238fddcc13d7d68f03b8fd9f2dbb5ffd7de6cd66f8cc26  data/board.scr
 2fd3a763a710172d47cbcdcfb7ae458986591411ab616cb6162129d12b63c77b  data/ev1.pak
 d91cd9c3889c711aff36b902b2a95741c6332b446a798ac6091e787a880880a9  data/ev1.raw
@@ -18,7 +18,7 @@ d0fe2beb8e011153c49d41d8ad235eb0b43206141894617aad5be9d2ab398cae  data/ev5.pak
 6bc5bcf737d1f33c71d2eb57092101d8b91b08c40c46c318f1afbe83419e95bb  data/ev5.raw
 d4672b988fe6e931e5f288b2941d61f80bf9227eefc9cdda7f0de9ffb6b4d582  data/hj.ovl
 1d9c01ef05b2e32ecb5bdbb14214e5ac42abc4584b192151ea00e2441ba68c8a  data/inter.bin
-cc8924f797075d5954d4866e43050200e5ab27f4e2f1ebc09b1832e6d977d680  data/jam.ovl
+712f814fcdd7ec9917b4d86a37f99e1735dbfda23eaff4416d56cb2048413433  data/jam.ovl
 a0602a3943218465d8157f62e6f3c12ffcc9d083752ba823625c51adb58de983  data/joust.ovl
 eda410dd8be357d4264f6d192a1b46acfe551e20696e142e68a9112118774419  data/list.scr
 d068d0da508ef6796c75a25ae0b376fe424cb6b951b8dc094a933f613766481c  data/map.scr
@@ -36,12 +36,12 @@ ba31b9cd73f307cbe400f96ee9153250cf40930125f0bb500a56b43cb017af82  data/shop.scr
 
 ## SkateOrDie_A1200_folder.zip (packaged from dist/; archive and HDF bytes contain timestamps, so their hashes change with every packaging run)
 ```
-a9c2f8c4c9649a074fe23c287d48e44f8c73b741a320abde83b19215e367ffa6  SkateOrDie_A1200_folder.zip
+56c4e286d9e6d9b650d843f82a076536c16cc5bfdc210ea4e47388d447ab4e1a  SkateOrDie_A1200_folder.zip
 ```
 
 ## SkateOrDie_A1200.hdf (packaged from dist/; archive and HDF bytes contain timestamps, so their hashes change with every packaging run)
 ```
-794bfd00f4ac0f69ba5dc39bc69215c44a4eaa2702d5e2efa5343bcc77f17f47  SkateOrDie_A1200.hdf
+64894095588f7411230c2721d693eedaf1be5034c94dd3fb350eae60aefc56dc  SkateOrDie_A1200.hdf
 ```
 
 ## Tools
