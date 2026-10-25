@@ -86,6 +86,10 @@
    "0x3A19": [
     "nat_fade_delay",
     "0x3A22"
+   ],
+   "0x26F6": [
+    "nat_camera",
+    "0x2719"
    ]
   }
  }

@@ -96,12 +96,15 @@ def run(cfgname, mode, passes, trace=False, script=None):
     snapshot = {b: bytes(C.mem[b << 16:(b << 16) + 65536]) for b in BANKS}
     cap = int(os.environ.get("T816_CAP", 4_000_000))
     otr = np.zeros((cap, 4), dtype=np.uint32) if trace else None
-    step_k = 0
+    step_k = 0; cam_cap = 0
     if cfgname == 'ev21':            # the jam's position step (native/dh21_consts.h N_STEP_K) is a deliberate change: the oracle gets the same one at $25B9
         import re
-        m = re.search(r'#define N_STEP_K (\d+)', open(f'{G}/native/dh21_consts.h').read()); step_k = int(m.group(1)) if m else 0
+        consts = open(f'{G}/native/dh21_consts.h').read()
+        m = re.search(r'#define N_STEP_K (\d+)', consts); step_k = int(m.group(1)) if m else 0
+        m = re.search(r'#define N_CAM_CAP (\d+)', consts); cam_cap = int(m.group(1)) if m else 0
     [C.hook(h) for h in hooks]; C.hook(0x077E08)
     if step_k: C.hook(0x0325B9)
+    if cam_cap: C.hook(0x0326F6)
     regs0 = (C.cpu.a, C.cpu.x, C.cpu.y, C.cpu.s, C.cpu.d, C.cpu.db, C.cpu.p)
     wl_cap = int(os.environ.get('T816_WL', 0))
     owl = np.zeros((wl_cap, 2), dtype=np.uint32) if wl_cap else None
@@ -115,6 +118,13 @@ def run(cfgname, mode, passes, trace=False, script=None):
         r = C.run(50_000_000)
         if r == 2: raise SystemExit('oracle fault at %06x' % C.fault_pc())
         if r == 0: print('oracle: instruction limit'); break
+        if cam_cap and C.hit_pc() == 0x0326F6:    # the camera's step with the larger cap, then the RTS at $2719
+            diff = (C.rd16(0x03646C) - C.rd16(0x036538)) & 0xFFFF
+            step = 0 if diff & 0x8000 else min(diff, cam_cap)
+            cam = (C.rd16(0x036538) + step) & 0xFFFF
+            C.wr16(0x036446, step); C.wr16(0x036538, cam); C.cpu.a = cam; C.cpu.pc = 0x2719
+            C.cpu.p = (C.cpu.p & ~(0x80 | 0x40 | 0x02 | 0x01)) | (0x80 if cam & 0x8000 else 0) | (0x02 if cam == 0 else 0)
+            continue
         if step_k and C.hit_pc() == 0x0325B9:     # INC $6464,X; LDA #0; STA $60FA,X; RTS with the position moving step_k rows
             x = C.cpu.x; C.wr16(0x036464 + x, (C.rd16(0x036464 + x) + step_k) & 0xFFFF); C.wr16(0x0360FA + x, 0)
             sp = C.cpu.s; ret = C.mem[(sp + 1) & 0xFFFF] | (C.mem[(sp + 2) & 0xFFFF] << 8)
@@ -151,6 +161,7 @@ def run(cfgname, mode, passes, trace=False, script=None):
     apply_input(tio, script(0))
     CB = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_uint32)
     snap = [bytes(rt.rt_bank_ptr(0xE1).contents[0x2000:0x9D00])]
+    probe = []
     dirty_bad = [0]; scroll_cfg = cfgname in C2P_SCROLL_CFGS; c2p_bad = [0, None]
     if scroll_cfg:
         rt.c2p_host_pass.restype = ctypes.POINTER(ctypes.c_uint8 * 32000); rt.c2p_host_init()
@@ -165,6 +176,8 @@ def run(cfgname, mode, passes, trace=False, script=None):
                 if c2p_bad[1] is None: c2p_bad[1] = (cnt[0], bad[:8].tolist())
             dirty_bad[0] += 0; snap[0] = cur
             thash.append((rt.rt_get_wr_hash(), rt.rt_get_wr_n()))
+            if os.environ.get('T816_JAMPROBE'):
+                b3 = rt.rt_bank_ptr(3).contents; probe.append(tuple(b3[a] | (b3[a + 1] << 8) for a in (0x6464, 0x6466, 0x6538, 0x646C)))
             if FAST: tstate.append((zlib.crc32(b''.join(masked(b, bytes(rt.rt_bank_ptr(b).contents), True) for b in BANKS)), cp.a, cp.x, cp.y, cp.s, (cp.n << 7) | (cp.v << 6) | (cp.z << 1) | cp.c))
             if cnt[0] > passes: return 1
             apply_input(tio, script(cnt[0]))
@@ -231,6 +244,11 @@ def run(cfgname, mode, passes, trace=False, script=None):
             for j in range(max(0, k - 3), k): print('   before: pc=%06x addr=%06x val=%02x' % (owl[j][0], owl[j][1] >> 8, owl[j][1] & 255))
     if scroll_cfg: print('passes whose planar picture differs from a conversion of the whole picture: %d%s' % (c2p_bad[0], '' if c2p_bad[1] is None else ' (first: pass %d, rows %s)' % c2p_bad[1])); ok = ok and c2p_bad[0] == 0
     elif cnt[0]: print('pixels changed outside the marked span: %d' % dirty_bad[0]); ok = ok and dirty_bad[0] == 0
+    if probe:
+        import numpy as _np
+        pr = _np.array(probe, dtype=_np.int64); d = _np.diff(pr, axis=0)
+        okd = (d[:, 0] >= 0) & (d[:, 0] < 40); okd2 = (d[:, 1] >= 0) & (d[:, 1] < 40); okc = (d[:, 2] >= 0) & (d[:, 2] < 40)
+        print('jam probe: max skater0 step %d, skater1 step %d, camera step %d per pass; max (leader - camera) %d, max (camera - trailer) %d; camera target - camera: max %d' % (d[okd, 0].max(), d[okd2, 1].max(), d[okc, 2].max(), (_np.maximum(pr[:, 0], pr[:, 1]) - pr[:, 2]).max(), (pr[:, 2] - _np.minimum(pr[:, 0], pr[:, 1])).max(), (pr[:, 3] - pr[:, 2]).max()))
     print('RESULT:', 'identical' if ok else 'DIFFERENT')
     return ok
 

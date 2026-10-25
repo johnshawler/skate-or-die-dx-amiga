@@ -189,6 +189,22 @@ static int nat_step_pos(void)
 }
 #endif
 
+#ifdef N_CAM_CAP
+/* $26F6 (jam), the end of the camera's pass: the scroll step is the distance to the camera's target ($646C, the middle between the two skaters) minus the camera ($6538),
+ * 0 if the camera is ahead, at most 4 in the original (CMP #5 / LDA #4); the camera moves by it. With the skaters moving up to 6 rows a pass the cap of 4 let them outrun the
+ * scroll: here the cap is N_CAM_CAP. Then STA $6446; LDA $6538; CLC; ADC $6446; STA $6538; RTS (the native continues at the RTS). */
+static int nat_camera(void)
+{
+    u16 A, target = G3(0x646C), cam = G3(0x6538), diff = (u16)(target - cam), step;
+    u8 N = 0, V = 0, Z = 0, C = 0;
+    step = (diff & 0x8000) ? 0 : diff <= N_CAM_CAP ? diff : N_CAM_CAP;
+    S3(0x6446, step);
+    A = cam; C = 0; ADC16(step); S3(0x6538, A);
+    cpu.a = A; cpu.n = N; cpu.v = V; cpu.z = Z; cpu.c = C;
+    return 1;
+}
+#endif
+
 #ifdef N_TILE
 /* $483A (jam): draw the 8x8 tile A (32 bytes: 8 rows of 4) of the scenery at the strip position given by the column ($644A, bytes) and the row ($644C, row table in bank 4 at $DE00)
  * into bank 2, twice (the strip is kept twice, $6E00 bytes apart), then step the column by 4 and, at 160, the row by 16 (at $190 back to 0). The tile graphics are read through the

@@ -155,6 +155,127 @@ static void ow_music_start(Plat *P)
     if (ow_pcm) raw_music_start(P, ow_pcm, base_size[7], 64);
 }
 
+/* ---- the "SKATING TO ..." screens. The original shows INTER's text screen "SKATING TO <event>" (the event names are in INTER's table at $7BC3: RAMP, HIGH JUMP,
+   DOWNHILL, JAM, POOL JOUST; "SKATING TO SKATESHOP" at the end, $7518) while the next event loads from the disk. Here the screen comes before every event, with the event's controls
+   from the manual added, and the game waits for a player's button before the event is loaded and started. Text on black in the shop's font, like INTER's other text screens. ---- */
+static const char *const sk_title[6] = {0, "SKATING TO RAMP", "SKATING TO HIGH JUMP", "SKATING TO DOWNHILL", "SKATING TO JAM", "SKATING TO POOL JOUST"};
+static const char *const sk_ramp[] = {
+    "FREESTYLE RAMP", "",
+    "MOVE THE CONTROLLER FORWARD OR BACK TO",
+    "CHOOSE YOUR ENTRY POSITION. YOU GET TEN",
+    "PASSES. IN A PUMP ZONE CLICK THE BUTTON",
+    "TO PUMP AND TO PICK A TRICK, AND LEAN THE",
+    "CONTROLLER INTO OR AWAY FROM YOUR",
+    "DIRECTION OF TRAVEL:", "",
+    " KICKTURN      AWAY       NO PUMP",
+    " ROCK-N-ROLL   INTO       NO PUMP",
+    " FOOTPLANT     AWAY       1 PUMP",
+    " RAIL SLIDE    INTO       1 PUMP",
+    " HANDPLANT     AWAY       2 PUMPS",
+    " OLLIE AIR     INTO       2 PUMPS",
+    " AERIAL        NO LEAN    0-2 PUMPS", "",
+    "IN THE AIR LEAN LEFT OR RIGHT TO SPIN,",
+    "THE OTHER WAY TO STOP.", 0};
+static const char *const sk_hj[] = {
+    "HIGH JUMP", "",
+    "IN THE RAMP MOVE THE CONTROLLER RAPIDLY",
+    "IN ANY DIRECTION TO BUILD SPEED. YOU CAN",
+    "TAKE A BREATHER WHILE YOU ARE IN THE AIR.",
+    "YOU GET UP TO FIVE PASSES ON THE RIGHT",
+    "SIDE, WHERE THE HEIGHT MARKER IS.", "",
+    "TO GO FOR IT AND RECORD THE ATTEMPT,",
+    "CLICK THE BUTTON AT THE HIGHEST POINT OF",
+    "YOUR JUMP. GOOD TIMING ADDS A FEW",
+    "INCHES. IF NOT, IT IS TIME TO BAIL.", 0};
+static const char *const sk_race[] = {
+    "DOWNHILL RACE", "",
+    "RACE AGAINST TIME AND COLLECT BONUSES.",
+    "PICK YOUR STYLE:", "",
+    "REGULAR FOOT: PULL THE CONTROLLER BACK",
+    " TO GO DOWNHILL, FORWARD TO SLOW OR STOP.",
+    "GOOFY FOOT: FORWARD TO GO DOWNHILL,",
+    " BACK TO SLOW OR STOP.", "",
+    "BOTH STYLES:",
+    " CLICK AND FORWARD     JUMP",
+    " CLICK AND BACK        DUCK",
+    " CLICK AND LEFT/RIGHT  SLIDE TURN", 0};
+static const char *const sk_jam[] = {
+    "DOWNHILL JAM", "",
+    "THE CONTROLS ARE LIKE DOWNHILL RACE, WITH",
+    "REGULAR AND GOOFY FOOT. CLICKING WHILE",
+    "LEANING THE CONTROLLER DOES THE",
+    "CLOBBERIN' STUFF:", "",
+    " CLICK AND LEAN INTO THE DIRECTION YOU",
+    "  ARE FACING          PUNCH",
+    " CLICK AND LEAN AWAY FROM IT   KICK", "",
+    "HIGH, MIDDLE OR LOW DEPENDS ON WHERE YOU",
+    "LEAN: HIGH AND LOW ARE ON THE DIAGONALS,",
+    "MIDDLE IS STRAIGHT TO THE SIDE.", "",
+    "PLAYER 2: KEYPAD DIGITS 1-9, SHIFT = BUTTON", 0};
+static const char *const sk_joust[] = {
+    "POOL JOUST", "",
+    "TWO GO IN, ONE COMES OUT. YOU GET FIVE",
+    "PASSES TO GET YOUR OPPONENT, THEN HE TAKES",
+    "THE BOFFING STICK AND YOU ARE IT. FIRST TO",
+    "THREE SLAMS WINS, BUT YOU HAVE TO WIN BY",
+    "TWO.", "",
+    "THE CONTROLS ARE A SIMPLIFIED RAMP",
+    "FREESTYLE: ROCK-N-ROLLS, RAIL SLIDES,",
+    "KICKTURNS AND OLLIES. NO PUMPING: A CLICK",
+    "READIES THE BOFFING STICK. ONLY HIT THE",
+    "OTHER GUY WHEN YOUR STICK IS FLASHING.", "",
+    "PLAYER 2: KEYPAD DIGITS 1-9, SHIFT = BUTTON", 0};
+static const char *const *const sk_lines[6] = {0, sk_ramp, sk_hj, sk_race, sk_jam, sk_joust};
+
+static void sk_text(Plat *P, const u8 *font, int row, int col, const char *t)
+{
+    int i;
+    for (i = 0; t[i] && col + i < 40; i++) {
+        int c = (u8)t[i];
+        if (c >= 'a' && c <= 'z') c -= 32;
+        if (c < 0x20 || c > 0x5F) c = 0x20;
+        if (c != 0x20) glyph_to(P->B[P->comp], font, 4 * (col + i), row * 8, c, 0x1111);
+    }
+}
+static int sk_len(const char *t) { int n = 0; while (t[n]) n++; return n; }
+/* draw the screen for event `mode` (1-5), or "SKATING TO SKATESHOP" (0) */
+static void sk_draw(Plat *P, const u8 *font, int mode)
+{
+    static const u16 pal[16] = {0x000, 0xFFF, 0xFFF, 0xFFF, 0xFFF, 0xFFF, 0xFFF, 0xFFF, 0xFFF, 0xFFF, 0xFFF, 0xFFF, 0xFFF, 0xFFF, 0xFFF, 0xFFF};
+    const char *title = mode ? sk_title[mode] : "SKATING TO SKATESHOP";
+    int i, row = 0;
+    P->comp = P->shown ^ 1;
+    for (i = 0; i < SCREEN_BYTES / 4; i++) ((u32 *)P->B[P->comp])[i] = 0;
+    if (!mode) {
+        sk_text(P, font, 12, (40 - sk_len(title)) / 2, title);
+    } else {
+        const char *const *l = sk_lines[mode];
+        sk_text(P, font, 0, (40 - sk_len(title)) / 2, title);
+        for (i = 0; l[i]; i++, row++) {
+            if (i == 0) sk_text(P, font, 2, (40 - sk_len(l[0])) / 2, l[0]);        /* the event's name, centred */
+            else sk_text(P, font, 2 + i, 1, l[i]);
+        }
+        sk_text(P, font, 21, 1, "CONTROLLER: JOYSTICK OR CURSOR KEYS");
+        sk_text(P, font, 22, 1, "BUTTON: FIRE, SPACE OR RETURN    ESC: BACK");
+        sk_text(P, font, 24, (40 - 19) / 2, "PRESS FIRE TO START");
+    }
+    set_palette(P, pal);
+    present(P);
+}
+/* wait for a player's button (the joystick in either port, Space, Return or Shift for the second player); the button that brought the skater to the exit must have been let go first.
+   Returns 0 if ESC was pressed instead. */
+static int sk_wait_fire(Plat *P)
+{
+    int armed = 0;
+    for (;;) {
+        int fire;
+        frame_wait(P); poll_keyboard(P);
+        if (P->keys[0x45]) return 0;
+        fire = !(CIAA_PRA & 0x80) || !(CIAA_PRA & 0x40) || P->keys[0x40] || P->keys[0x44] || P->keys[0x60] || P->keys[0x61];
+        if (!fire) armed = 1; else if (armed) { P->evh = P->evt; return 1; }
+    }
+}
+
 /* play event `mode` (1 ramp, 2 high jump, 3 downhill race, 4 downhill jam): free what the shop and map hold, load the event overlay (data/<name>.ovl, one event's
    code at a time) and run it; it loads its own image, song and effects. Returns the overlay's result, -1 if it could not be loaded. */
 static int run_event(Plat *P, Menu *M, int mode, u32 vbl_hz)
@@ -167,6 +288,8 @@ static int run_event(Plat *P, Menu *M, int mode, u32 vbl_hz)
     EvArgs a;
     u32 seg;
     int rc;
+    sk_draw(P, menu_fnt, mode);                                      /* "SKATING TO <event>" with its controls; the game waits for a player's button */
+    if (!sk_wait_fire(P)) { M->inter_valid = 0; return 0; }          /* ESC: back to the shop */
     music_stop(); R16(DMACON) = 0x000F; P->stream = 0;
     { int i; for (i = 0; i < 3072; i++) M->font[i] = menu_fnt[i]; }
     os_give();
@@ -187,12 +310,20 @@ static int run_event(Plat *P, Menu *M, int mode, u32 vbl_hz)
         dos_UnLoadSeg(seg);
         if (a.rc < 0 || !a.next) break;
         a.mode = a.next; a.next = 0;
+        os_take(P);                                                  /* (the event handed the machine back to AmigaDOS: the keyboard needs it ours) */
+        sk_draw(P, M->font, a.mode);                                 /* the next event of a competition in all events */
+        if (!sk_wait_fire(P)) { os_give(); a.esc = 1; seg = 1; a.rc = 0; break; }
+        os_give();
     }
 #ifdef BENCH_LOOP
     if (!seg || a.esc || ++a.run >= 24) break;
     }
 #endif
     rc = seg ? a.rc : -1;
+    os_take(P);
+    sk_draw(P, M->font, 0);                                          /* "SKATING TO SKATESHOP", on screen for a second and a half and while the shop's files load */
+    { int w; for (w = 0; w < (int)(vbl_hz * 3 / 2); w++) frame_wait(P); }
+    os_give();
     ow_load_base(1);
     os_take(P);
     ow_music_start(P);
