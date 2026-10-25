@@ -100,3 +100,7 @@ You asked for the speed of the NES version. Measured on the NES ROM in FCEUX (60
 * FS-UAE's timing is a model; real A1200 timing, chip-bus contention and the audio under load are unmeasured. The 14.19 MHz clock is an assumption.
 * Joust headroom 12%; Jam: 4.8% of the passes over their slot at 12/s (the scrolling passes).
 * Kickstart 1.3 in `roms/` is Guardian-patched and cannot run AGA; the IIGS ROM and disk image are not in the repository (`docs/briefs/ROM-Locations-Brief.md`).
+
+## Title screen: "Skate or Die DX"
+
+`tools/title_credit.py` (run by `build.sh` on `assets/title_orig.scr`) now also changes the logo: the "!" after "DIE" is removed and a hand-drawn "DX" is placed under the right end of "DIE" in the logo's own style (white strokes, red shadow, grey highlight, same palette indices as the original lettering, so no palette change). Checked on FS-UAE (A1200, cycle-exact): the title boots with the new logo and the credit list, including "Amiga version by Boatofcar", is intact.
