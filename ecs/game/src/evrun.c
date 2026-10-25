@@ -696,7 +696,7 @@ int ev_overlay_main(EvArgs *a)
 #ifndef BENCH_LOOP
     if (ev_ibin) { asset_free(ev_ibin, ibin_size); ev_ibin = 0; }
 #endif
-#ifdef DEBUG_KEYS
+#if defined(DEBUG_KEYS) && !defined(WHDLOAD)
     if (dbg_n) { u32 fh = dos_Open("PROGDIR:data/dbg.bin", 1006); if (fh) { dos_Write(fh, dbg_t, dbg_n * 4); dos_Close(fh); } dbg_n = 0; }
 #endif
 #ifdef WHD_TRACE

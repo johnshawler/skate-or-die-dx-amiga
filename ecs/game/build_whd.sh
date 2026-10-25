@@ -18,9 +18,10 @@ $CC $FL -Os -Iruntime -I$T/runtime -Inative -I$T/native -Isrc -c $B/inter.c -o $
 for n in 1 2 3 4 5; do
   case $n in 1|2|5) EVOPT="$INL";; *) EVOPT=;; esac
   python3 -I tools/gen_ecs.py cfg/${cfgs[$n]}.json $B/ev$n.c 2>/dev/null
-  $CC $FL ${EVOPT:-} -Iruntime -I$T/runtime -Inative -I$T/native -Isrc -c $B/ev$n.c -o $B/ev$n.o
+  case $n in 3|4) B2D=-DT816_B2DIRTY;; *) B2D=;; esac
+  $CC $FL $B2D ${EVOPT:-} -Iruntime -I$T/runtime -Inative -I$T/native -Isrc -c $B/ev$n.c -o $B/ev$n.o
   $CC $FL -Iruntime -I$T/runtime -Inative -I$T/native -Isrc -c src/evrun.c -o $B/evrun$n.o -DEV_MODE=$n
-  $CC $FL -Os -Iruntime -c runtime/m816rt.c -o $B/rt$n.o
+  $CC $FL $B2D -Os -Iruntime -c runtime/m816rt.c -o $B/rt$n.o
   m68k-linux-gnu-ld -T src/link.ld --emit-relocs -o $B/ov$n.elf $B/evrun$n.o $B/ev$n.o $B/inter.o $B/rt$n.o 2>&1 | grep -v "warning\|NOTE" || true
   python3 -I tools/elf2whd.py $B/ov$n.elf $O/data/${names[$n]}.ovx SODO
 done

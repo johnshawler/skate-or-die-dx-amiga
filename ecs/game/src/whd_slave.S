@@ -72,12 +72,8 @@ fail:   pea     progname(%pc)            /* secondary: the file name */
 progname: .asciz "SkateOrDie.bin"
 dir:    .asciz  "data"
 name:   .asciz  "Skate or Die"
-copy:   .asciz  "1988 Electronic Arts / Ultra Games"
-info:   .ascii  "Amiga port of the Apple IIGS original,\n"
-        .ascii  "installed by Claude (Anthropic) for John Shawler\n"
+copy:   .asciz  "(c)1988 Electronic Arts"
+info:   .ascii  "Amiga version by Boatofcar\n"
         .ascii  "Needs AGA, 68020+, 2 MB Chip and 2 MB Fast RAM\n"
         .ascii  "Joystick or cursor keys + SPACE/RETURN, ESC quits\n"
         .asciz  "Version 1.0 (WHDLoad)"
-        .ascii  "$VER: SkateOrDie WHDLoad slave 1.0 (24.10.2026)"
-        .byte   0
-        .even
