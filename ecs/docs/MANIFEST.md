@@ -1,6 +1,6 @@
 # Artifact manifest
 
-Generated 2026-10-25T13:16:41Z from commit `876b9f294c8d40c40cb99ed4730474687e419771` (working tree: 0 modified/untracked paths under ecs/game).
+Generated 2026-10-25T14:38:36Z from commit `54544d3d39736a582fa1472586ff850575472e1d` (working tree: 0 modified/untracked paths under ecs/game).
 
 ## Product (dist/)
 ```
@@ -18,7 +18,7 @@ d0fe2beb8e011153c49d41d8ad235eb0b43206141894617aad5be9d2ab398cae  data/ev5.pak
 6bc5bcf737d1f33c71d2eb57092101d8b91b08c40c46c318f1afbe83419e95bb  data/ev5.raw
 d4672b988fe6e931e5f288b2941d61f80bf9227eefc9cdda7f0de9ffb6b4d582  data/hj.ovl
 1d9c01ef05b2e32ecb5bdbb14214e5ac42abc4584b192151ea00e2441ba68c8a  data/inter.bin
-712f814fcdd7ec9917b4d86a37f99e1735dbfda23eaff4416d56cb2048413433  data/jam.ovl
+40206a58b9f920c5432dfa794a20e6db1e68aa212fc857bfb46e15cc8a6ad91a  data/jam.ovl
 a0602a3943218465d8157f62e6f3c12ffcc9d083752ba823625c51adb58de983  data/joust.ovl
 eda410dd8be357d4264f6d192a1b46acfe551e20696e142e68a9112118774419  data/list.scr
 d068d0da508ef6796c75a25ae0b376fe424cb6b951b8dc094a933f613766481c  data/map.scr
@@ -31,17 +31,17 @@ d068d0da508ef6796c75a25ae0b376fe424cb6b951b8dc094a933f613766481c  data/map.scr
 ba31b9cd73f307cbe400f96ee9153250cf40930125f0bb500a56b43cb017af82  data/shop.scr
 98aded4e4818b21f2574d8affdd5e856b5f14adf6b8979948ad653b8942a543d  data/skater.spr
 546636e70ec21983af97487e19778c446dfcd3119fcdb95c604ec1d258801e67  data/title.ima
-7e1e3f292f2930e207d1e1b0db841bbd498094fe1e9ddf8fb9ec5a2b36294d3c  data/title.scr
+ccec389086a2b97d9fb043a230d184e58362289a6fa191b8fea69abf7f181014  data/title.scr
 ```
 
 ## SkateOrDie_A1200_folder.zip (packaged from dist/; archive and HDF bytes contain timestamps, so their hashes change with every packaging run)
 ```
-56c4e286d9e6d9b650d843f82a076536c16cc5bfdc210ea4e47388d447ab4e1a  SkateOrDie_A1200_folder.zip
+7b55dc1a1074ed173efe2bccc2b2a3cf5eb69ac975418249f61484ed91bae103  SkateOrDie_A1200_folder.zip
 ```
 
 ## SkateOrDie_A1200.hdf (packaged from dist/; archive and HDF bytes contain timestamps, so their hashes change with every packaging run)
 ```
-64894095588f7411230c2721d693eedaf1be5034c94dd3fb350eae60aefc56dc  SkateOrDie_A1200.hdf
+7608588d33df7eda3596cbc5d89a6c4aea8a37908a3a58b9b2399c2c8ec0cbdb  SkateOrDie_A1200.hdf
 ```
 
 ## Tools

@@ -39,7 +39,7 @@ Maps each requirement of the `/rom-first` brief (`BRIEFS.md`, part 1) to its res
 | Freestyle Ramp | 29 | 24.9 ms | 29.4 | 34.2 | 28% | 1.0% | 333 KB |
 | High Jump | 27 | 28.0 ms | 31.2 | 34.1 | 24% | 0.5% | 325 KB |
 | Downhill Race (21/s, the NES version's skating speed) | 21 | 25.0 ms | 25.0 | 34.9 | 47% | 0.3% | not re-measured |
-| Downhill Jam (14/s, skaters 2 rows per step: your "try it" for the NES pace) | 14 | 45.7 ms | 72.1 | 80.6 | 36% | 6.0% | not re-measured |
+| Downhill Jam (14/s, skaters 2 rows per step, camera follows the leader) | 14 | 45.4 ms | 71.9 | 81.5 | 36% | 5.6% | not re-measured |
 | Pool Joust | 16 | 54.7 ms | 57.2 | 63.2 | **12% (target 20% not met)** | 1.7% | 197 KB |
 
 All five hold their pace (on-screen counter 29/27/11/12/16; the jam's lowest second was 11, the others equal to their average). The race runs at the original's rate on this model (its in-game clock advances the same as on the IIGS emulator within about 1%) and the jam 20% faster than the original; the NES version updates at 60 per second, this port does not. Worst single pass 0.12 s (ramp, high jump), 0.5 s (race, jam: a scene load), 2.2 s (joust: a round change).
@@ -69,7 +69,8 @@ All five hold their pace (on-screen counter 29/27/11/12/16; the jam's lowest sec
 | Practice prompt, ESC | test build | YES restarts, NO / `n` returns; ESC in an event or results screen returns to the shop |
 
 ## 7. Known gaps and decisions needed
-00. **Jam scroll and "SKATING TO ..." screens (your last request):** the camera of the jam now moves up to 7 rows a pass (it was 4) so the skaters cannot outrun it; the screens "SKATING TO <event>" (with the event's controls from the manual and a wait for the button) come before every event and "SKATING TO SKATESHOP" after it. Seen working on the A1200 model; the joystick button and the WHDLoad build are not tested. Details: `RESULTS_GAME_BUILD.md`, "\"SKATING TO ...\" screens, and the Jam's scroll".
+000. **Jam camera and title screen (latest):** the camera follows the leading skater (within 40 rows) so a skater at full speed cannot outrun the scroll; the title's credit list has the bullet "AMIGA VERSION BY BOATOFCAR". Details: `RESULTS_GAME_BUILD.md`.
+00. **Jam scroll and "SKATING TO ..." screens (before that):** the camera of the jam now moves up to 7 rows a pass (it was 4) so the skaters cannot outrun it; the screens "SKATING TO <event>" (with the event's controls from the manual and a wait for the button) come before every event and "SKATING TO SKATESHOP" after it. Seen working on the A1200 model; the joystick button and the WHDLoad build are not tested. Details: `RESULTS_GAME_BUILD.md`, "\"SKATING TO ...\" screens, and the Jam's scroll".
 0. **NES speed** (details: `RESULTS_GAME_BUILD.md`, "Matching the NES version's speed"): the map skater (50 passes a second) and the race (21) move at the NES's speed. The **jam** is a first try at it, as you asked: skaters advance 2 rows per step and the jam runs at 14 passes a second (coasting 7 px/s, full effort 56, the NES 27): **needs your play-test**, the step and the pace are single numbers. The race / jam **clocks run faster than real time** (the original's clocks count passes: race 2.1x, jam 1.4x), left that way as you decided.
 1. **Joust headroom 12% on the mean** (median 19%): below the 20% contract. More optimisation is possible but not guaranteed to reach 20%; or accept 12%.
 2. **Race and jam endings:** the race's natural ending is now seen (your save state, section 6) in practice mode; the race inside a competition, and the jam's end (time limit or finish), were run only with a test key (F6) ending each one, not by reaching their natural end.
