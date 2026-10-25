@@ -1,6 +1,6 @@
 # Artifact manifest
 
-Generated 2026-10-25T00:16:54Z from commit `77327666b03df03c62b65c90a03d76584e1bdccb` (working tree: 1 modified/untracked paths under ecs/game).
+Generated 2026-10-25T01:03:05Z from commit `ea18dee9822ad45b40adc40f89e4aab86aab6398` (working tree: 0 modified/untracked paths under ecs/game).
 
 ## Product (dist/)
 ```
@@ -16,16 +16,16 @@ e4e01975142b04a28a5606cb748571d4fa4acaf2916b363a47d16440e0af2dff  data/ev2.pak
 59c0017da5f5c3f725fbe13d47992d69dabfd7ee0b33aa1da91f8a9a6124b25c  data/ev4.raw
 d0fe2beb8e011153c49d41d8ad235eb0b43206141894617aad5be9d2ab398cae  data/ev5.pak
 6bc5bcf737d1f33c71d2eb57092101d8b91b08c40c46c318f1afbe83419e95bb  data/ev5.raw
-2b7af4bc0d779f85b9a6bf88efdd168c4e1dcbccd7232ebb931de5d4e8e7e1fa  data/hj.ovl
+d4672b988fe6e931e5f288b2941d61f80bf9227eefc9cdda7f0de9ffb6b4d582  data/hj.ovl
 1d9c01ef05b2e32ecb5bdbb14214e5ac42abc4584b192151ea00e2441ba68c8a  data/inter.bin
-af18a09c256371a6032fa8df4adf524a05f6caa2dec286626642765ccd24b9c5  data/jam.ovl
-d4f4b822e475a6105a20c2abc857ce337e420458f7c958759fd82edd9c626dad  data/joust.ovl
+cc8924f797075d5954d4866e43050200e5ab27f4e2f1ebc09b1832e6d977d680  data/jam.ovl
+a0602a3943218465d8157f62e6f3c12ffcc9d083752ba823625c51adb58de983  data/joust.ovl
 eda410dd8be357d4264f6d192a1b46acfe551e20696e142e68a9112118774419  data/list.scr
 d068d0da508ef6796c75a25ae0b376fe424cb6b951b8dc094a933f613766481c  data/map.scr
 1ca35f28688a8f1264a758f45976453af97d40e6818b13adb50eac0fa85c7e7a  data/menu.fnt
 2053813ecf4c43dcd3b80c060ba0df951dcabe96b4ecec1885a8de14ba1d90e8  data/ow.raw
-70888bb8065107c5c3a9be497821b31047ae74521b545a69735720769c36942f  data/race.ovl
-dafc4a68ff86ffccdc62b77efdee7c85c03228d8f2dbf30ceeab777bb8fb7ad6  data/ramp.ovl
+2018fcd370a391c2a19dd95fe728876de55319858e868591c8e7d575ea4e6d24  data/race.ovl
+9ad6abf4ebec60eb16d5226b8112346e6f033a5e82efdf0933533816e97201a7  data/ramp.ovl
 58a34b6f9da2ad6eef813595092894e05c37d45309fdd272bb4b130f008c7b68  data/scores.scr
 5380aa41982c389410aa6180b1ff44f46b0659b17d4251cfb71432a10a05fd10  data/sfx.raw
 ba31b9cd73f307cbe400f96ee9153250cf40930125f0bb500a56b43cb017af82  data/shop.scr
@@ -36,12 +36,12 @@ ba31b9cd73f307cbe400f96ee9153250cf40930125f0bb500a56b43cb017af82  data/shop.scr
 
 ## SkateOrDie_A1200_folder.zip (packaged from dist/; archive and HDF bytes contain timestamps, so their hashes change with every packaging run)
 ```
-bd0131b3fa3cb782a8b368e886e65932e9576c313d654c787a39bb023f52fb9b  SkateOrDie_A1200_folder.zip
+a9c2f8c4c9649a074fe23c287d48e44f8c73b741a320abde83b19215e367ffa6  SkateOrDie_A1200_folder.zip
 ```
 
 ## SkateOrDie_A1200.hdf (packaged from dist/; archive and HDF bytes contain timestamps, so their hashes change with every packaging run)
 ```
-cc2f58f1baef4eda70da9e268730c1628be631200d43b55078eb44fd51abcbd4  SkateOrDie_A1200.hdf
+794bfd00f4ac0f69ba5dc39bc69215c44a4eaa2702d5e2efa5343bcc77f17f47  SkateOrDie_A1200.hdf
 ```
 
 ## Tools
