@@ -284,6 +284,9 @@ static void sk_draw(Plat *P, const u8 *font, int mode)
 static int sk_wait_fire(Plat *P)
 {
     int armed = 0;
+#ifdef BENCH_LOOP
+    return 1;                                                        /* the timing and profile builds start events with a test key and have nobody to press the button */
+#endif
     for (;;) {
         int fire;
         frame_wait(P); poll_keyboard(P);
