@@ -1,6 +1,6 @@
 # Artifact manifest
 
-Generated 2026-10-25T14:38:36Z from commit `54544d3d39736a582fa1472586ff850575472e1d` (working tree: 0 modified/untracked paths under ecs/game).
+Generated 2026-10-25T18:17:37Z from commit `88e3d76c8e6f6c4c817512a064a478823b511af6` (working tree: 0 modified/untracked paths under ecs/game).
 
 ## Product (dist/)
 ```
@@ -34,14 +34,19 @@ ba31b9cd73f307cbe400f96ee9153250cf40930125f0bb500a56b43cb017af82  data/shop.scr
 ccec389086a2b97d9fb043a230d184e58362289a6fa191b8fea69abf7f181014  data/title.scr
 ```
 
-## SkateOrDie_A1200_folder.zip (packaged from dist/; archive and HDF bytes contain timestamps, so their hashes change with every packaging run)
+## SkateOrDie_Amiga.zip (packaged from dist/; archive and HDF bytes contain timestamps, so their hashes change with every packaging run)
 ```
-7b55dc1a1074ed173efe2bccc2b2a3cf5eb69ac975418249f61484ed91bae103  SkateOrDie_A1200_folder.zip
+862f597a4519f04b160e30b695db5aaa05c4d283ef9f851db6123aaa098cc15b  SkateOrDie_Amiga.zip
+```
+
+## SkateOrDie_WHDLoad.zip (packaged from dist/; archive and HDF bytes contain timestamps, so their hashes change with every packaging run)
+```
+0c2540df48dfde2f54a2a29aff0669733d4ba4f1460a2744c19f72c30ec162ad  SkateOrDie_WHDLoad.zip
 ```
 
 ## SkateOrDie_A1200.hdf (packaged from dist/; archive and HDF bytes contain timestamps, so their hashes change with every packaging run)
 ```
-7608588d33df7eda3596cbc5d89a6c4aea8a37908a3a58b9b2399c2c8ec0cbdb  SkateOrDie_A1200.hdf
+05d3127e9d1b76e443917fa85fc616c9785ae099f9f77b533c6ef2183fd9da95  SkateOrDie_A1200.hdf
 ```
 
 ## Tools
