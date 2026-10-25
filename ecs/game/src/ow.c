@@ -160,39 +160,46 @@ static void ow_music_start(Plat *P)
    from the manual added, and the game waits for a player's button before the event is loaded and started. Text on black in the shop's font, like INTER's other text screens. ---- */
 static const char *const sk_title[6] = {0, "SKATING TO RAMP", "SKATING TO HIGH JUMP", "SKATING TO DOWNHILL", "SKATING TO JAM", "SKATING TO POOL JOUST"};
 static const char *const sk_ramp[] = {
-    "FREESTYLE RAMP", "",
+    "FREESTYLE RAMP",
+    "",
     "MOVE THE CONTROLLER FORWARD OR BACK TO",
     "CHOOSE YOUR ENTRY POSITION. YOU GET TEN",
     "PASSES. IN A PUMP ZONE CLICK THE BUTTON",
-    "TO PUMP AND TO PICK A TRICK, AND LEAN THE",
+    "TO PUMP AND PICK A TRICK, AND LEAN THE",
     "CONTROLLER INTO OR AWAY FROM YOUR",
-    "DIRECTION OF TRAVEL:", "",
+    "DIRECTION OF TRAVEL:",
+    "",
     " KICKTURN      AWAY       NO PUMP",
     " ROCK-N-ROLL   INTO       NO PUMP",
     " FOOTPLANT     AWAY       1 PUMP",
     " RAIL SLIDE    INTO       1 PUMP",
     " HANDPLANT     AWAY       2 PUMPS",
     " OLLIE AIR     INTO       2 PUMPS",
-    " AERIAL        NO LEAN    0-2 PUMPS", "",
+    " AERIAL        NO LEAN    0-2 PUMPS",
+    "",
     "IN THE AIR LEAN LEFT OR RIGHT TO SPIN,",
     "THE OTHER WAY TO STOP.", 0};
 static const char *const sk_hj[] = {
-    "HIGH JUMP", "",
-    "IN THE RAMP MOVE THE CONTROLLER RAPIDLY",
-    "IN ANY DIRECTION TO BUILD SPEED. YOU CAN",
-    "TAKE A BREATHER WHILE YOU ARE IN THE AIR.",
-    "YOU GET UP TO FIVE PASSES ON THE RIGHT",
-    "SIDE, WHERE THE HEIGHT MARKER IS.", "",
+    "HIGH JUMP",
+    "",
+    "IN THE RAMP MOVE THE CONTROLLER",
+    "RAPIDLY IN ANY DIRECTION TO BUILD",
+    "SPEED. YOU CAN TAKE A BREATHER WHILE",
+    "YOU ARE IN THE AIR. YOU GET UP TO FIVE",
+    "PASSES ON THE RIGHT SIDE, WHERE THE",
+    "HEIGHT MARKER IS.",
+    "",
     "TO GO FOR IT AND RECORD THE ATTEMPT,",
-    "CLICK THE BUTTON AT THE HIGHEST POINT OF",
-    "YOUR JUMP. GOOD TIMING ADDS A FEW",
-    "INCHES. IF NOT, IT IS TIME TO BAIL.", 0};
+    "CLICK THE BUTTON AT THE HIGHEST",
+    "POINT OF YOUR JUMP. GOOD TIMING ADDS A",
+    "FEW INCHES. IF NOT, IT'S TIME TO BAIL.", 0};
 static const char *const sk_race[] = {
     "DOWNHILL RACE", "",
     "RACE AGAINST TIME AND COLLECT BONUSES.",
     "PICK YOUR STYLE:", "",
-    "REGULAR FOOT: PULL THE CONTROLLER BACK",
-    " TO GO DOWNHILL, FORWARD TO SLOW OR STOP.",
+    "REGULAR FOOT: PULL THE CONTROLLER",
+    " BACK TO GO DOWNHILL, FORWARD TO",
+    " SLOW OR STOP.",
     "GOOFY FOOT: FORWARD TO GO DOWNHILL,",
     " BACK TO SLOW OR STOP.", "",
     "BOTH STYLES:",
@@ -200,31 +207,40 @@ static const char *const sk_race[] = {
     " CLICK AND BACK        DUCK",
     " CLICK AND LEFT/RIGHT  SLIDE TURN", 0};
 static const char *const sk_jam[] = {
-    "DOWNHILL JAM", "",
-    "THE CONTROLS ARE LIKE DOWNHILL RACE, WITH",
-    "REGULAR AND GOOFY FOOT. CLICKING WHILE",
-    "LEANING THE CONTROLLER DOES THE",
-    "CLOBBERIN' STUFF:", "",
+    "DOWNHILL JAM",
+    "",
+    "THE CONTROLS ARE LIKE DOWNHILL RACE,",
+    "WITH REGULAR AND GOOFY FOOT. CLICKING",
+    "WHILE LEANING THE CONTROLLER DOES THE",
+    "CLOBBERIN' STUFF:",
+    "",
     " CLICK AND LEAN INTO THE DIRECTION YOU",
-    "  ARE FACING          PUNCH",
-    " CLICK AND LEAN AWAY FROM IT   KICK", "",
-    "HIGH, MIDDLE OR LOW DEPENDS ON WHERE YOU",
-    "LEAN: HIGH AND LOW ARE ON THE DIAGONALS,",
-    "MIDDLE IS STRAIGHT TO THE SIDE.", "",
-    "PLAYER 2: KEYPAD DIGITS 1-9, SHIFT = BUTTON", 0};
+    "  ARE FACING: PUNCH",
+    " CLICK AND LEAN AWAY FROM IT: KICK",
+    "",
+    "HIGH, MIDDLE OR LOW DEPENDS ON WHERE",
+    "YOU LEAN: HIGH AND LOW ARE ON THE",
+    "DIAGONALS, MIDDLE IS STRAIGHT TO THE",
+    "SIDE.",
+    "",
+    "PLAYER 2: KEYPAD 1-9, SHIFT = BUTTON", 0};
 static const char *const sk_joust[] = {
-    "POOL JOUST", "",
+    "POOL JOUST",
+    "",
     "TWO GO IN, ONE COMES OUT. YOU GET FIVE",
-    "PASSES TO GET YOUR OPPONENT, THEN HE TAKES",
-    "THE BOFFING STICK AND YOU ARE IT. FIRST TO",
-    "THREE SLAMS WINS, BUT YOU HAVE TO WIN BY",
-    "TWO.", "",
+    "PASSES TO GET YOUR OPPONENT, THEN HE",
+    "TAKES THE BOFFING STICK AND YOU ARE IT.",
+    "FIRST TO THREE SLAMS WINS, BUT YOU",
+    "HAVE TO WIN BY TWO.",
+    "",
     "THE CONTROLS ARE A SIMPLIFIED RAMP",
     "FREESTYLE: ROCK-N-ROLLS, RAIL SLIDES,",
-    "KICKTURNS AND OLLIES. NO PUMPING: A CLICK",
-    "READIES THE BOFFING STICK. ONLY HIT THE",
-    "OTHER GUY WHEN YOUR STICK IS FLASHING.", "",
-    "PLAYER 2: KEYPAD DIGITS 1-9, SHIFT = BUTTON", 0};
+    "KICKTURNS AND OLLIES. NO PUMPING: A",
+    "CLICK READIES THE BOFFING STICK. ONLY",
+    "HIT THE OTHER GUY WHEN YOUR STICK IS",
+    "FLASHING.",
+    "",
+    "PLAYER 2: KEYPAD 1-9, SHIFT = BUTTON", 0};
 static const char *const *const sk_lines[6] = {0, sk_ramp, sk_hj, sk_race, sk_jam, sk_joust};
 
 static void sk_text(Plat *P, const u8 *font, int row, int col, const char *t)
@@ -256,7 +272,8 @@ static void sk_draw(Plat *P, const u8 *font, int mode)
             else sk_text(P, font, 2 + i, 1, l[i]);
         }
         sk_text(P, font, 21, 1, "CONTROLLER: JOYSTICK OR CURSOR KEYS");
-        sk_text(P, font, 22, 1, "BUTTON: FIRE, SPACE OR RETURN    ESC: BACK");
+        sk_text(P, font, 22, 1, "BUTTON: FIRE, SPACE OR RETURN");
+        sk_text(P, font, 23, 1, "ESC: BACK TO THE SKATE SHOP");
         sk_text(P, font, 24, (40 - 19) / 2, "PRESS FIRE TO START");
     }
     set_palette(P, pal);
