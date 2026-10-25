@@ -60,6 +60,9 @@ def make_script(kind, seed):
     def script(k):
         if kind == 'idle': return (0, 0, 0, 0)
         if kind == 'fire': return (0, 0, 1, 0)
+        if kind.startswith('pump'):        # full effort: the stick alternates left/right every pass (pump1) or every 2 / 3 passes, the button held or pulsed
+            n = int(kind[4]) if len(kind) > 4 and kind[4].isdigit() else 1
+            return (1 if (k // n) % 2 else -1, 0, 1 if kind.endswith('b') else (1 if k % 4 < 2 else 0), 0)
         if kind == 'waggle':          # fast left/right alternation (running), fire pulses of random length, now and then up/down
             if st['hold_j'] <= 0:
                 st['jx'] = -st['jx'] if st['jx'] else 1; st['hold_j'] = rng.choice([1, 1, 2, 3, 6])
@@ -96,12 +99,13 @@ def run(cfgname, mode, passes, trace=False, script=None):
     snapshot = {b: bytes(C.mem[b << 16:(b << 16) + 65536]) for b in BANKS}
     cap = int(os.environ.get("T816_CAP", 4_000_000))
     otr = np.zeros((cap, 4), dtype=np.uint32) if trace else None
-    step_k = 0; cam_cap = 0
+    step_k = 0; cam_cap = 0; cam_lead = 0
     if cfgname == 'ev21':            # the jam's position step (native/dh21_consts.h N_STEP_K) is a deliberate change: the oracle gets the same one at $25B9
         import re
         consts = open(f'{G}/native/dh21_consts.h').read()
         m = re.search(r'#define N_STEP_K (\d+)', consts); step_k = int(m.group(1)) if m else 0
         m = re.search(r'#define N_CAM_CAP (\d+)', consts); cam_cap = int(m.group(1)) if m else 0
+        m = re.search(r'#define N_CAM_LEAD (\d+)', consts); cam_lead = int(m.group(1)) if m else 0
     [C.hook(h) for h in hooks]; C.hook(0x077E08)
     if step_k: C.hook(0x0325B9)
     if cam_cap: C.hook(0x0326F6)
@@ -119,7 +123,9 @@ def run(cfgname, mode, passes, trace=False, script=None):
         if r == 2: raise SystemExit('oracle fault at %06x' % C.fault_pc())
         if r == 0: print('oracle: instruction limit'); break
         if cam_cap and C.hit_pc() == 0x0326F6:    # the camera's step with the larger cap, then the RTS at $2719
-            diff = (C.rd16(0x03646C) - C.rd16(0x036538)) & 0xFFFF
+            target = C.rd16(0x03646C); lead = max(C.rd16(0x036464), C.rd16(0x036466))
+            if cam_lead and lead >= cam_lead and ((lead - cam_lead) & 0xFFFF) > target: target = (lead - cam_lead) & 0xFFFF
+            diff = (target - C.rd16(0x036538)) & 0xFFFF
             step = 0 if diff & 0x8000 else min(diff, cam_cap)
             cam = (C.rd16(0x036538) + step) & 0xFFFF
             C.wr16(0x036446, step); C.wr16(0x036538, cam); C.cpu.a = cam; C.cpu.pc = 0x2719

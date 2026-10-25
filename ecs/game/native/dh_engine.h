@@ -195,8 +195,12 @@ static int nat_step_pos(void)
  * scroll: here the cap is N_CAM_CAP. Then STA $6446; LDA $6538; CLC; ADC $6446; STA $6538; RTS (the native continues at the RTS). */
 static int nat_camera(void)
 {
-    u16 A, target = G3(0x646C), cam = G3(0x6538), diff = (u16)(target - cam), step;
+    u16 A, target = G3(0x646C), cam = G3(0x6538), p0 = G3(0x6464), p1 = G3(0x6466), lead = p0 > p1 ? p0 : p1, diff, step;
     u8 N = 0, V = 0, Z = 0, C = 0;
+#ifdef N_CAM_LEAD
+    if (lead >= N_CAM_LEAD && (u16)(lead - N_CAM_LEAD) > target) target = (u16)(lead - N_CAM_LEAD);      /* the leader stays within N_CAM_LEAD rows of the camera, not just of the middle */
+#endif
+    diff = (u16)(target - cam);
     step = (diff & 0x8000) ? 0 : diff <= N_CAM_CAP ? diff : N_CAM_CAP;
     S3(0x6446, step);
     A = cam; C = 0; ADC16(step); S3(0x6538, A);
