@@ -175,6 +175,20 @@ static int nat_dh_restore(void)
 }
 
 
+#ifdef N_STEP_K
+/* $25B9 (jam): INC $6464,X (the skater's position down the course, X = 0 or 2 for the two skaters), LDA #0, STA $60FA,X, RTS. The position moves N_STEP_K rows instead of one:
+ * the skaters run N_STEP_K times as fast along the course at the same number of passes. Called from the speed accumulator ($2577) and from the two boost steps ($2AB0, $2ABF). */
+static int nat_step_pos(void)
+{
+    u16 x = cpu.x;
+    if ((u32)0x6464 + x > 0xFFFD || (u32)0x60FA + x > 0xFFFD) return 0;
+    ST16(B3 + 0x6464 + x, (u16)(LE16(B3 + 0x6464 + x) + N_STEP_K));
+    ST16(B3 + 0x60FA + x, 0);
+    cpu.a = 0; cpu.n = 0; cpu.z = 1;
+    return 1;
+}
+#endif
+
 /* ---- 383F (jam): draw the 8x8 character in A at the text cursor (columns at $6470, rows at $6472 of bank 3) straight into bank E1 and move the cursor on ---- */
 #ifdef N_JGLYPH
 #ifndef N_JG_COL

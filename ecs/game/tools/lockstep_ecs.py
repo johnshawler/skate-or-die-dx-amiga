@@ -96,7 +96,12 @@ def run(cfgname, mode, passes, trace=False, script=None):
     snapshot = {b: bytes(C.mem[b << 16:(b << 16) + 65536]) for b in BANKS}
     cap = int(os.environ.get("T816_CAP", 4_000_000))
     otr = np.zeros((cap, 4), dtype=np.uint32) if trace else None
+    step_k = 0
+    if cfgname == 'ev21':            # the jam's position step (native/dh21_consts.h N_STEP_K) is a deliberate change: the oracle gets the same one at $25B9
+        import re
+        m = re.search(r'#define N_STEP_K (\d+)', open(f'{G}/native/dh21_consts.h').read()); step_k = int(m.group(1)) if m else 0
     [C.hook(h) for h in hooks]; C.hook(0x077E08)
+    if step_k: C.hook(0x0325B9)
     regs0 = (C.cpu.a, C.cpu.x, C.cpu.y, C.cpu.s, C.cpu.d, C.cpu.db, C.cpu.p)
     wl_cap = int(os.environ.get('T816_WL', 0))
     owl = np.zeros((wl_cap, 2), dtype=np.uint32) if wl_cap else None
@@ -110,6 +115,11 @@ def run(cfgname, mode, passes, trace=False, script=None):
         r = C.run(50_000_000)
         if r == 2: raise SystemExit('oracle fault at %06x' % C.fault_pc())
         if r == 0: print('oracle: instruction limit'); break
+        if step_k and C.hit_pc() == 0x0325B9:     # INC $6464,X; LDA #0; STA $60FA,X; RTS with the position moving step_k rows
+            x = C.cpu.x; C.wr16(0x036464 + x, (C.rd16(0x036464 + x) + step_k) & 0xFFFF); C.wr16(0x0360FA + x, 0)
+            sp = C.cpu.s; ret = C.mem[(sp + 1) & 0xFFFF] | (C.mem[(sp + 2) & 0xFFFF] << 8)
+            C.cpu.s = (sp + 2) & 0xFFFF; C.cpu.pc = (ret + 1) & 0xFFFF; C.cpu.a = 0; C.cpu.p = (C.cpu.p & ~0x80) | 0x02
+            continue
         if C.hit_pc() not in hooks: print('oracle: event left the overlay at', hex(C.hit_pc()), 'after', hits, 'passes'); break
         hits += 1
         ohash.append((C.wlog_hash(), C.wlog_n()))

@@ -480,7 +480,7 @@ static void ev_prepare(Plat *P, int mode, u32 vbl_hz)
     cpu.a = cpu.x = cpu.y = 0; cpu.s = 0x1FF; cpu.d = 0; cpu.db = 0; cpu.n = cpu.v = cpu.z = cpu.c = cpu.i = 0;
     io.enabled = 1; io.key_waiting = 0; io.key = 0; io.anykey = 0; io.mods = 0; io.btn[0] = io.btn[1] = io.btn[2] = 0; io.shr = 1;
     for (i = 0; i < 4; i++) { io.pdl_len[i] = 60; io.pdl_left[i] = 0; }
-    ev_hz = mode == 1 ? 29 : mode == 2 ? 27 : mode == 3 ? 21 : mode == 4 ? 12 : 16;       /* the passes a second the original manages in each event (KEGS, ecs/docs/SOURCE_GATE.md); the jam 20% faster (the original's 10) at the user's request; the race at the NES version's speed (21: its skater coasts at 21.3 px/s, the original code moves 1 px a pass) */
+    ev_hz = mode == 1 ? 29 : mode == 2 ? 27 : mode == 3 ? 21 : mode == 4 ? 14 : 16;       /* the passes a second the original manages in each event (KEGS, ecs/docs/SOURCE_GATE.md); the jam 14, with the skaters moving twice as far a pass (N_STEP_K in native/dh21_consts.h): about the NES version's speed at the effort of a player who pushes steadily; the race at the NES version's speed (21: its skater coasts at 21.3 px/s, the original code moves 1 px a pass) */
     gP = P; ev_vbl = (int)vbl_hz; ev_abort = 0; ev_forced = 0;
     c2p_all_dirty();                                                 /* every run of an event starts with a picture the converter knows nothing about */
     ev_period = (vbl_hz << 16) / (u32)ev_hz; ev_last_tod = *(volatile u8 *)0xBFE801UL; ev_now = 0; ev_due = 0;

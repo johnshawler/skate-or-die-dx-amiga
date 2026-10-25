@@ -9,3 +9,4 @@
 
 #define N_JGLYPH 1
 #define N_BG_SCROLL 1    /* nat_bgfill reports the scroll to the platform (c2p.h, C2P_SCROLL) */
+#define N_STEP_K 2       /* nat_step_pos: a skater advances this many rows each time the original advances it by one (the NES version's skating speed; the original itself moves up to 2 rows a pass) */
