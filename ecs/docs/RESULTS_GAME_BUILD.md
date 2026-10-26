@@ -104,3 +104,7 @@ You asked for the speed of the NES version. Measured on the NES ROM in FCEUX (60
 ## Title screen: "Skate or Die DX"
 
 `tools/title_credit.py` (run by `build.sh` on `assets/title_orig.scr`) now also changes the logo: the "!" after "DIE" is removed and a hand-drawn "DX" is placed under the right end of "DIE" in the logo's own style (white strokes, red shadow, grey highlight, same palette indices as the original lettering, so no palette change). Checked on FS-UAE (A1200, cycle-exact): the title boots with the new logo and the credit list, including "Amiga version by Boatofcar", is intact.
+
+## WHDLoad splash text
+
+The slave now shows name "Skate or Die DX", copyright "(c)1988 Electronic Arts" and info "DX Amiga version by Boatofcar" (followed by the requirements, controls and "Version 1.0 (WHDLoad)"). Seen on FS-UAE with WHDLoad 18.0 and 4 MB Fast RAM: the splash window shows exactly these lines. The itch upload still has the previous slave text until it is pushed again.
