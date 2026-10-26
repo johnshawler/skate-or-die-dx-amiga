@@ -353,6 +353,9 @@ static int run_event(Plat *P, Menu *M, int mode, u32 vbl_hz)
     }
 #endif
     rc = seg ? a.rc : -1;
+#ifdef WHD_TRACE
+    { u32 t[2]; t[0] = wh_peak_fast; t[1] = wh_peak_chip; g_os->save("trace9.bin", t, 8); }       /* most Fast / Chip memory in use so far (the arena sizes the slave must ask for) */
+#endif
     wh_load();
     os_take(P);
     sk_draw(P, M->font, 0);                                          /* "SKATING TO SKATESHOP", on screen for the whoosh (1.9 s) and while the shop's files load */

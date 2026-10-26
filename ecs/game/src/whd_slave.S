@@ -4,7 +4,7 @@
    a0 = resload, a1 = first free byte after the image, d0 = bytes still free in the expansion memory, d1 = size of the base memory.
    When the program returns, the loader hands control back to WHDLoad (resload_Abort, TDREASON_OK). */
         .set    BASEMEM, 0x180000        /* Chip RAM the game may use */
-        .set    EXPMEM,  0x200000        /* expansion (Fast) memory it needs */
+        .set    EXPMEM,  0x1A0000        /* expansion (Fast) memory it needs: the most the game uses is 1.48 MB (events 1-5), so 2 MB of Fast RAM is enough with WHDLoad's own share */
         .text
         .globl  _start
 _start:
@@ -74,6 +74,6 @@ dir:    .asciz  "data"
 name:   .asciz  "Skate or Die DX"
 copy:   .asciz  "(c)1988 Electronic Arts"
 info:   .ascii  "DX Amiga version by Boatofcar\n"
-        .ascii  "Needs AGA, 68020+, 2 MB Chip and 4 MB Fast RAM\n"
+        .ascii  "Needs AGA, 68020+, 2 MB Chip and 2 MB Fast RAM\n"
         .ascii  "Joystick or cursor keys + SPACE/RETURN, ESC quits\n"
         .asciz  "Version 1.0 (WHDLoad)"
