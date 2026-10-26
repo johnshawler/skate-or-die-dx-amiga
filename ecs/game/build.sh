@@ -10,6 +10,7 @@ FL="-m68020 -O2 -ffixed-a6 -fomit-frame-pointer -ffreestanding -fno-builtin -fno
 cp assets/inter.bin dist/data/inter.bin
 [ -f dist/data/ow.raw ] || python3 -I tools/make_data.py $ROOT/demo/assets dist/data
 python3 -I tools/title_credit.py assets/title_orig.scr dist/data/title.scr >/dev/null      # the title's credit list gets the Amiga bullet
+python3 -I tools/make_whoosh.py dist/data/sfx.raw dist/data/whoosh.raw                   # the whoosh of "SKATING TO ..."
 # the program
 $CC $FL -Os -c src/ow.c -o $B/ow.o -Isrc
 m68k-linux-gnu-ld -T src/link.ld --emit-relocs -o $B/ow.elf $B/ow.o 2>&1 | grep -v "warning\|NOTE" || true

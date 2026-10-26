@@ -140,18 +140,20 @@ static void music_stop(void)
 }
 
 /* play a sound effect (NES sound id) on channels 2 and 3, which Paula sends right and left: heard in the middle */
-static void sfx_play(Plat *P, int id)
+static void sfx_play_buf(Plat *P, const u8 *src, u32 len)
 {
-    u32 off, len;
     int i;
-    if (id < SFX_FIRST || id >= SFX_FIRST + SFX_COUNT) return;
-    off = sfx_tab[id - SFX_FIRST][0]; len = sfx_tab[id - SFX_FIRST][1];
     if (len < 4 || len > SFX_CAP) return;
     R16(DMACON) = 0x000C;
-    copy32((u32 *)P->sfx, (const u32 *)(sfx_raw + off), len / 4);
+    copy32((u32 *)P->sfx, (const u32 *)src, len / 4);
     for (i = 2; i < 4; i++) { R32(AUDLC(i)) = (u32)P->sfx; R16(AUDLEN(i)) = (u16)(len / 2); R16(AUDPER(i)) = P->sper; R16(AUDVOL(i)) = 64; }
     R16(DMACON) = 0x800C;
     P->sfx_wait = 2;
+}
+static void sfx_play(Plat *P, int id)
+{
+    if (id < SFX_FIRST || id >= SFX_FIRST + SFX_COUNT) return;
+    sfx_play_buf(P, sfx_raw + sfx_tab[id - SFX_FIRST][0], sfx_tab[id - SFX_FIRST][1]);
 }
 
 /* ---- keyboard (raw CIA poll; interrupts are off while we own the machine) ---- */

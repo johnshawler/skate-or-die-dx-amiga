@@ -108,3 +108,7 @@ You asked for the speed of the NES version. Measured on the NES ROM in FCEUX (60
 ## WHDLoad splash text
 
 The slave now shows name "Skate or Die DX", copyright "(c)1988 Electronic Arts" and info "DX Amiga version by Boatofcar" (followed by the requirements, controls and "Version 1.0 (WHDLoad)"). Seen on FS-UAE with WHDLoad 18.0 and 4 MB Fast RAM: the splash window shows exactly these lines. The itch upload still has the previous slave text until it is pushed again.
+
+## The whoosh on the "SKATING TO ..." screens
+
+The NES version plays its sound $0A (a 1.9 s falling noise sweep) at the moment the skater enters an event, just before the event's song (FCEUX log of the ROM: $0A at the entrance, then the song id). `data/whoosh.raw` is that effect cut out of `sfx.raw` (`tools/make_whoosh.py`, run by `build.sh`). It plays when each "SKATING TO ..." screen appears (to an event, to the next event of a competition, and "SKATING TO SKATESHOP"); the shop screen waits 1.9 s so it finishes. The file is loaded with the shop's files (or before the machine is taken) and freed before an event. Checked on FS-UAE with a test build and a recording: correlating the recording with the effect finds it at the start of the Joust screen (0.46) and at the way back (0.54), against 0.34 for the best chance match. The IIGS original's own sample is not on the supplied disks, so the NES effect is used for both directions (the NES itself plays none on the way back to the map). Not tested under WHDLoad, nor the competition's between-events screen.

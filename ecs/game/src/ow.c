@@ -132,6 +132,10 @@ static void map_animate(Plat *P, Menu *M)
     if ((M->pass & 3) == 0) { map_water_frame = (map_water_frame + 1) & 3; map_draw_water(P, map_water_frame); }
 }
 
+static const u8 *wh_pcm;
+static u32 wh_size;
+static void wh_load(void) { if (!wh_pcm) wh_pcm = (const u8 *)asset_load("whoosh.raw", 0, &wh_size); }
+static void wh_free(void) { if (wh_pcm) { asset_free(wh_pcm, wh_size); wh_pcm = 0; } }
 /* ---- the files the shop and the map need (screens, font, skater sprites, the overworld song): loaded with AmigaDOS running ---- */
 static const char *const base_names[8] = {"map.scr", "shop.scr", "list.scr", "board.scr", "scores.scr", "menu.fnt", "skater.spr", "ow.raw"};
 static const u8 **const base_ptr[8] = {&pictures[0], &pictures[1], &pictures[2], &pictures[3], &pictures[4], &menu_fnt, &skater_spr, &ow_pcm};
@@ -142,12 +146,14 @@ static int ow_load_base(int with_music)
         *base_ptr[i] = (const u8 *)asset_load(base_names[i], i == 7 ? MEMF_CHIP : 0, &base_size[i]);            /* the song is played by Paula: chip RAM */
         if (!*base_ptr[i]) ok = 0;
     }
+    wh_load();
     return ok;
 }
 static void ow_free_base(void)
 {
     int i;
     for (i = 0; i < 8; i++) { asset_free(*base_ptr[i], base_size[i]); *base_ptr[i] = 0; }
+    wh_free();
 }
 /* the overworld song: an 8-bit loop played straight from chip RAM */
 static void ow_music_start(Plat *P)
@@ -254,6 +260,11 @@ static void sk_text(Plat *P, const u8 *font, int row, int col, const char *t)
     }
 }
 static int sk_len(const char *t) { int n = 0; while (t[n]) n++; return n; }
+/* the whoosh the NES version plays on the way to an event (NES sound $0A, a falling noise sweep of 1.9 s: the NES log in work/nes_audio shows it at the moment the skater
+   enters an event, just before the event's song; data/whoosh.raw is that effect cut out of sfx.raw by tools/make_whoosh.py): played on Paula's effect channels. The file is loaded
+   with AmigaDOS running (with the shop's files, or before the machine is taken for the next screen) and freed again before an event starts. */
+#define WHOOSH_MS 1900
+static void sk_whoosh(Plat *P) { if (wh_pcm) sfx_play_buf(P, wh_pcm, wh_size); }
 /* draw the screen for event `mode` (1-5), or "SKATING TO SKATESHOP" (0) */
 static void sk_draw(Plat *P, const u8 *font, int mode)
 {
@@ -278,6 +289,7 @@ static void sk_draw(Plat *P, const u8 *font, int mode)
     }
     set_palette(P, pal);
     present(P);
+    sk_whoosh(P);
 }
 /* wait for a player's button (the joystick in either port, Space, Return or Shift for the second player); the button that brought the skater to the exit must have been let go first.
    Returns 0 if ESC was pressed instead. */
@@ -330,20 +342,22 @@ static int run_event(Plat *P, Menu *M, int mode, u32 vbl_hz)
         dos_UnLoadSeg(seg);
         if (a.rc < 0 || !a.next) break;
         a.mode = a.next; a.next = 0;
+        wh_load();
         os_take(P);                                                  /* (the event handed the machine back to AmigaDOS: the keyboard needs it ours) */
         sk_draw(P, M->font, a.mode);                                 /* the next event of a competition in all events */
-        if (!sk_wait_fire(P)) { os_give(); a.esc = 1; seg = 1; a.rc = 0; break; }
-        os_give();
+        if (!sk_wait_fire(P)) { os_give(); wh_free(); a.esc = 1; seg = 1; a.rc = 0; break; }
+        os_give(); wh_free();
     }
 #ifdef BENCH_LOOP
     if (!seg || a.esc || ++a.run >= 24) break;
     }
 #endif
     rc = seg ? a.rc : -1;
+    wh_load();
     os_take(P);
-    sk_draw(P, M->font, 0);                                          /* "SKATING TO SKATESHOP", on screen for a second and a half and while the shop's files load */
-    { int w; for (w = 0; w < (int)(vbl_hz * 3 / 2); w++) frame_wait(P); }
-    os_give();
+    sk_draw(P, M->font, 0);                                          /* "SKATING TO SKATESHOP", on screen for the whoosh (1.9 s) and while the shop's files load */
+    { int w; for (w = 0; w < (int)(vbl_hz * WHOOSH_MS / 1000); w++) frame_wait(P); }        /* long enough for the whoosh to finish */
+    os_give(); wh_free();
     ow_load_base(1);
     os_take(P);
     ow_music_start(P);
