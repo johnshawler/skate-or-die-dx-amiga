@@ -558,7 +558,7 @@ static int menu_pass(Menu *m, const MenuGfx *g, unsigned ctl, unsigned kbd)
     case MS_PICK:
         if (ev && (nib == 0xD || nib == 0xE)) {         /* $3DCC / $3DF8: the row changes even during the lock-out */
             menu_arrow(m, g, m->c2, 0x20);
-            if (nib == 0xD) menu_next(m); else menu_prev(m);
+            m->c4 = 0; if (nib == 0xD) menu_next(m); else menu_prev(m);
         }
         if (m->c6) { if (!fire) m->c6--; break; }       /* $3712 */
         m->mask = 0x1111; menu_arrow(m, g, m->c2, 0x3E);
@@ -573,7 +573,7 @@ static int menu_pass(Menu *m, const MenuGfx *g, unsigned ctl, unsigned kbd)
         if (m->state == MS_BOARD && ev && (nib == 0xB || nib == 0x7 || nib == 0xD || nib == 0xE)) {     /* $3E24 (left, up) / $3E88 (right, down) */
             m->mask = 0x4444;
             m->gy = menu_board_y[m->c2]; m->gx = menu_board_x[m->c2]; menu_glyph(m, g, 0x20);
-            if (nib == 0xB || nib == 0xE) { m->trow++; menu_prev(m); } else menu_next(m);
+            m->c4 = 0; if (nib == 0xB || nib == 0xE) { m->trow++; menu_prev(m); } else menu_next(m);   /* (c4: the original moves once in nine presses; every one moves here) */
             m->board[m->d4] = (unsigned char)(m->c2 + 1);
             menu_board_color(m, m->d4);
         }
@@ -596,7 +596,7 @@ static int menu_pass(Menu *m, const MenuGfx *g, unsigned ctl, unsigned kbd)
         if (ev && (nib == 0xD || nib == 0xE)) {         /* $3D64 / $3D98 */
             unsigned r = m->c2 >= 8 ? 8 : m->c2;
             menu_arrow(m, g, r, 0x20);
-            if (nib == 0xD) menu_next(m); else menu_prev(m);
+            m->c4 = 0; if (nib == 0xD) menu_next(m); else menu_prev(m);
         }
         if (m->c6) { if (!fire) m->c6--; break; }       /* $3A7B */
         {
