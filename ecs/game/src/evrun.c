@@ -164,6 +164,7 @@ static void ev_load_pak(const u8 *p)
    and the song starts a moment after the last of them (the original starts it at once, under the prompts). The second player's prompts are his own. */
 static int ev_music_want, ev_vp_n, ev_vp_hold, ev_vp_done, ev_music_done, ev_vp_started;
 static u32 ev_vp_t0, ev_vp_t1, ev_vp_tlast, ev_vp_lastmove;
+static int ev_mode_cur, ev_fresh;
 #define VP_TIMES 2
 static int vp_press(Plat *P, int moving);
 u32 rt_jsl(u32 target)
@@ -186,7 +187,7 @@ void rt_fade_wait(void)
     Plat *P = gP;
     u16 pal[16]; int i, n;
     if (P == (Plat *)1) return;
-    if (txt_on) inter_text_leave(P);
+    if (txt_on || ev_fresh) { ev_fresh = 0; inter_text_leave(P); }
     for (i = 0; i < 16; i++) pal[i] = LE16(BE1 + 0x9E00 + 2 * i);
     set_palette(P, pal);
     n = (ev_vbl * 79 + 500) / 1000;
@@ -294,7 +295,15 @@ static int vp_press(Plat *P, int moving)
     u32 t, idle = (u32)(ev_vbl * 35 / 100);
     if (!ev_vp_n) return 0;
     if (moving) ev_vp_lastmove = g_vbl;
-    if (!ev_vp_started) { ev_vp_started = 1; ev_vp_t0 = g_vbl; ev_vp_lastmove = g_vbl - idle; }
+    if (!ev_vp_started) {
+        if (ev_mode_cur == 5) {                                          /* the joust's opponent choice (portraits, in the passes of the game) is the player's: wait for the pool, whose top rows hold only HUD text */
+            const u8 *r = BE1 + 0x2000; int k, n = 0; u32 seen = 0;
+            for (k = 0; k < 8 * 160; k++) seen |= (1UL << (r[k] >> 4)) | (1UL << (r[k] & 15));
+            for (k = 1; k < 16; k++) if (seen & (1UL << k)) n++;
+            if (n == 0 || n > 3) return 0;                               /* the HUD text uses one or two colours (a player's name has his own), the portraits' top rows seven or more */
+        }
+        ev_vp_started = 1; ev_vp_t0 = g_vbl; ev_vp_lastmove = g_vbl - idle;
+    }
     if (ev_vp_hold > 0) { ev_vp_hold--; return 1; }
     t = g_vbl - ev_vp_t0;
     if (!(ev_vp_done & 1)) {
@@ -393,7 +402,7 @@ int rt_pass(u32 pc)
     if ((tr_pass & 31) == 0) { u32 t[4]; t[0] = tr_pass; t[1] = tr_poll; t[2] = tr_text; t[3] = *(volatile u8 *)0xBFE801UL; g_os->save("trace3.bin", t, 16); }
 #endif
     poll_run = 0;
-    if (txt_on) inter_text_leave(P);
+    if (txt_on || ev_fresh) { ev_fresh = 0; inter_text_leave(P); }
     /* picture */
     P->comp = P->shown ^ 1;
 #ifdef TIMING
@@ -511,7 +520,8 @@ int rt_pass(u32 pc)
 static void ev_prepare(Plat *P, int mode, u32 vbl_hz)
 {
     int i;
-    if (txt_on) inter_text_leave(P);
+    ev_fresh = 1;                                                    /* the "SKATING TO" screen is still up: it goes when the event first shows something (rt_fade_wait, rt_pass), not under its fade-in */
+    ev_mode_cur = mode;
     cpu.a = cpu.x = cpu.y = 0; cpu.s = 0x1FF; cpu.d = 0; cpu.db = 0; cpu.n = cpu.v = cpu.z = cpu.c = cpu.i = 0;
     io.enabled = 1; io.key_waiting = 0; io.key = 0; io.anykey = 0; io.mods = 0; io.btn[0] = io.btn[1] = io.btn[2] = 0; io.shr = 1;
     for (i = 0; i < 4; i++) { io.pdl_len[i] = 60; io.pdl_left[i] = 0; }
