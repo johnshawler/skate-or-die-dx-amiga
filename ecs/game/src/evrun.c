@@ -159,14 +159,21 @@ static void ev_load_pak(const u8 *p)
 
 /* the event's song (IMA ADPCM, streamed through the ring) and the platform's side of the sound driver in INTER bank 7:
    $8003 = play effect A (the IIGS driver's effect numbers are used as NES sound ids), $8006 = start the event's music, $8009 = stop it */
+/* The event's start-up: one press of the button at the "SKATING TO ..." screen is all a player gives. The prompts at the start of an event (the original asks for the button
+   once, the jam and the joust twice: "press your button", then the control or the opponent) are answered for player 1 with virtual presses at fixed times after the event starts,
+   and the song starts a moment after the last of them (the original starts it at once, under the prompts). The second player's prompts are his own. */
+static int ev_music_want, ev_vp_n, ev_vp_hold, ev_vp_done, ev_music_done, ev_vp_started;
+static u32 ev_vp_t0, ev_vp_t1, ev_vp_tlast, ev_vp_lastmove;
+#define VP_TIMES 2
+static int vp_press(Plat *P, int moving);
 u32 rt_jsl(u32 target)
 {
     Plat *P = gP;
     if (P == (Plat *)1) return 0;
     switch (target) {
     case 0x078003: sfx_play(P, (int)(cpu.a & 0xFF)); break;
-    case 0x078006: if (ev_song) raw_music_start(P, ev_song, ev_song_size, 48); break;
-    case 0x078009: music_stop(); break;
+    case 0x078006: if (ev_vp_n) ev_music_want = 1; else if (ev_song) raw_music_start(P, ev_song, ev_song_size, 48); break;           /* the original starts the song before its "press your button" prompts; here it starts when the stage does (vp_tick) */
+    case 0x078009: ev_music_want = 0; music_stop(); break;
     }
     return 0;
 }
@@ -277,6 +284,33 @@ static void inter_esc(void)                         /* ESC in a text screen: lea
 {
     ev_abort = 1;
     if (inter_jb_set) inter_longjmp(inter_jb, 1);
+}
+/* called once by every pass of the game (not by INTER's text screens: the opponent's choice in the joust, "next skater" and the practice question are the players'): 1 while a virtual
+   press of player 1's button is on (3 passes long). The first press comes 0.3 s after the first pass; the second (jam: after "press your button" comes the control) 1.0 s after the
+   first pass that follows the first press, when its prompt is up. A press waits until the controller has rested for 0.35 s: a player who nudges it to choose the goofy foot (or the
+   entry position in the ramp) gets his choice, and the press confirms it when he lets go. The song starts 0.5 s after the last press. */
+static int vp_press(Plat *P, int moving)
+{
+    u32 t, idle = (u32)(ev_vbl * 35 / 100);
+    if (!ev_vp_n) return 0;
+    if (moving) ev_vp_lastmove = g_vbl;
+    if (!ev_vp_started) { ev_vp_started = 1; ev_vp_t0 = g_vbl; ev_vp_lastmove = g_vbl - idle; }
+    if (ev_vp_hold > 0) { ev_vp_hold--; return 1; }
+    t = g_vbl - ev_vp_t0;
+    if (!(ev_vp_done & 1)) {
+        if (t >= (u32)(ev_vbl * 3 / 10) && g_vbl - ev_vp_lastmove >= idle) { ev_vp_done |= 1; ev_vp_hold = 2; ev_vp_tlast = g_vbl; return 1; }
+        return 0;
+    }
+    if (ev_vp_n > 1 && !(ev_vp_done & 2)) {
+        if (!ev_vp_t1) ev_vp_t1 = g_vbl;
+        if (g_vbl - ev_vp_t1 >= (u32)ev_vbl && g_vbl - ev_vp_lastmove >= idle) { ev_vp_done |= 2; ev_vp_hold = 2; ev_vp_tlast = g_vbl; return 1; }
+        return 0;
+    }
+    if (ev_music_want && !ev_music_done && g_vbl - ev_vp_tlast >= (u32)(ev_vbl / 2)) {
+        ev_music_done = 1;
+        if (ev_song) raw_music_start(P, ev_song, ev_song_size, 48);
+    }
+    return 0;
 }
 /* a key poll of INTER's text screens: one frame per poll */
 static void inter_text_poll(Plat *P)
@@ -454,6 +488,7 @@ int rt_pass(u32 pc)
            more "right/down". Short timers (the oracle runs used 0/60/300) save a few thousand instructions a pass; the decisions are the same. */
         io.pdl_len[0] = jx < 0 ? 0 : jx > 0 ? 96 : 50;
         io.pdl_len[1] = jy < 0 ? 0 : jy > 0 ? 96 : 50;
+        if (vp_press(P, jx || jy)) fire = 1;
         io.btn[0] = fire ? 0x80 : 0;
         io.anykey = 0;
         if (P->evh != P->evt) {
@@ -485,6 +520,12 @@ static void ev_prepare(Plat *P, int mode, u32 vbl_hz)
     c2p_all_dirty();                                                 /* every run of an event starts with a picture the converter knows nothing about */
     ev_period = (vbl_hz << 16) / (u32)ev_hz; ev_last_tod = *(volatile u8 *)0xBFE801UL; ev_now = 0; ev_due = 0;
     P->evh = P->evt;
+#ifdef BENCH_LOOP
+    ev_vp_n = 0;                                                     /* the timing builds bring their own input */
+#else
+    ev_vp_n = mode == 4 ? 2 : 1;                                     /* the jam asks for the button twice (press your button, then the control) */
+#endif
+    ev_vp_started = 0; ev_vp_t1 = 0; ev_vp_hold = 0; ev_vp_done = 0; ev_music_want = 0; ev_music_done = 0;
 }
 
 #ifdef DEBUG_KEYS

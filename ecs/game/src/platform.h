@@ -110,8 +110,10 @@ static void audio_service(Plat *P)
         for (i = 2; i < 4; i++) { R32(AUDLC(i)) = (u32)P->silent; R16(AUDLEN(i)) = 2; }
 }
 
+static u32 g_vbl;                                           /* frames waited for so far (a clock for the event's start-up help, evrun.c) */
 static void frame_wait(Plat *P)
 {
+    g_vbl++;
     wait_vbl();
     audio_service(P);
 }
@@ -137,6 +139,13 @@ static void music_start(Plat *P, u32 pcm, u32 len, u16 per, int vol)
 static void music_stop(void)
 {
     R16(DMACON) = 0x0003;
+    R16(AUDVOL(0)) = 0; R16(AUDVOL(1)) = 0;                  /* a stopped channel holds its last sample: volume 0 keeps that DC level out of the output */
+}
+static void audio_off(void)                                  /* all four channels */
+{
+    int i;
+    R16(DMACON) = 0x000F;
+    for (i = 0; i < 4; i++) R16(AUDVOL(i)) = 0;
 }
 
 /* play a sound effect (NES sound id) on channels 2 and 3, which Paula sends right and left: heard in the middle */

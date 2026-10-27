@@ -211,7 +211,9 @@ static const char *const sk_race[] = {
     "BOTH STYLES:",
     " CLICK AND FORWARD     JUMP",
     " CLICK AND BACK        DUCK",
-    " CLICK AND LEFT/RIGHT  SLIDE TURN", 0};
+    " CLICK AND LEFT/RIGHT  SLIDE TURN", "",
+    "NUDGE THE CONTROLLER AT THE START TO",
+    "CHANGE STYLE; LET GO AND IT BEGINS.", 0};
 static const char *const sk_jam[] = {
     "DOWNHILL JAM",
     "",
@@ -229,7 +231,9 @@ static const char *const sk_jam[] = {
     "DIAGONALS, MIDDLE IS STRAIGHT TO THE",
     "SIDE.",
     "",
-    "PLAYER 2: KEYPAD 1-9, SHIFT = BUTTON", 0};
+    "PLAYER 2: KEYPAD 1-9, SHIFT = BUTTON",
+    "NUDGE THE CONTROLLER AT THE START TO",
+    "CHANGE STYLE; LET GO AND IT BEGINS.", 0};
 static const char *const sk_joust[] = {
     "POOL JOUST",
     "",
@@ -320,9 +324,10 @@ static int run_event(Plat *P, Menu *M, int mode, u32 vbl_hz)
     EvArgs a;
     u32 seg;
     int rc;
+    music_stop(); P->stream = 0;                                     /* the shop's song ends here: the whoosh, then silence */
     sk_draw(P, menu_fnt, mode);                                      /* "SKATING TO <event>" with its controls; the game waits for a player's button */
     if (!sk_wait_fire(P)) { M->inter_valid = 0; return 0; }          /* ESC: back to the shop */
-    music_stop(); R16(DMACON) = 0x000F; P->stream = 0;
+    audio_off();
     { int i; for (i = 0; i < 3072; i++) M->font[i] = menu_fnt[i]; }
     os_give();
     ow_free_base();
@@ -344,8 +349,10 @@ static int run_event(Plat *P, Menu *M, int mode, u32 vbl_hz)
         a.mode = a.next; a.next = 0;
         wh_load();
         os_take(P);                                                  /* (the event handed the machine back to AmigaDOS: the keyboard needs it ours) */
+        music_stop(); P->stream = 0;
         sk_draw(P, M->font, a.mode);                                 /* the next event of a competition in all events */
-        if (!sk_wait_fire(P)) { os_give(); wh_free(); a.esc = 1; seg = 1; a.rc = 0; break; }
+        if (!sk_wait_fire(P)) { audio_off(); os_give(); wh_free(); a.esc = 1; seg = 1; a.rc = 0; break; }
+        audio_off();                                        /* (the whoosh must not go on looping while the files load) */
         os_give(); wh_free();
     }
 #ifdef BENCH_LOOP
@@ -358,8 +365,10 @@ static int run_event(Plat *P, Menu *M, int mode, u32 vbl_hz)
 #endif
     wh_load();
     os_take(P);
+    music_stop(); P->stream = 0;
     sk_draw(P, M->font, 0);                                          /* "SKATING TO SKATESHOP", on screen for the whoosh (1.9 s) and while the shop's files load */
     { int w; for (w = 0; w < (int)(vbl_hz * WHOOSH_MS / 1000); w++) frame_wait(P); }        /* long enough for the whoosh to finish */
+    audio_off();
     os_give(); wh_free();
     ow_load_base(1);
     os_take(P);
