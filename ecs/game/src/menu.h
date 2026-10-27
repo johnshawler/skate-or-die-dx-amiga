@@ -32,6 +32,7 @@ typedef struct Menu {
     unsigned short f4bcd, f4bcf, f4bd1, f4bd3;
     unsigned short sign_frame;            /* $3036: 0..2, picks the flashing colour of the sign */
     unsigned short pass;                  /* $3038: counts logic passes */
+    unsigned short nprev;                 /* the direction nibble of the last pass (Amiga: a new press answers at once) */
     unsigned short f60, f62, f64, f66, f68, f6e, f70;   /* screen-setup requests handled at the start of the next pass */
     unsigned short exit_code;             /* $6C */
     unsigned short practice;              /* $077E17 */
@@ -530,7 +531,10 @@ static int menu_pass(Menu *m, const MenuGfx *g, unsigned ctl, unsigned kbd)
     menu_speech(m, g);
     menu_blink(m, g);
     m->shadow_x = m->slot_x; m->shadow_y = m->slot_y; m->shadow_f = m->slot_f;
-    ev = (m->pass & 7) == 0;
+    /* The list and board screens answer a held direction on every 8th pass only ($3DCC...). Tapped keys fall between those passes and were missed, and a held one moved
+       3 times a second at this pass rate: a new press now answers at once, and a held one every 4th pass. */
+    ev = (nib != 0xF && nib != m->nprev) || (m->pass & 3) == 0;
+    m->nprev = (unsigned short)nib;
     m->carry = 0;                                   /* the dispatcher's ASL leaves carry clear */
     if (m->f70) {                                   /* $3BB5 */
         m->f70 = 0; m->state = MS_SCORES; m->c6 = 8; m->f6e = 1;

@@ -164,17 +164,25 @@ static void ev_load_pak(const u8 *p)
    and the song starts a moment after the last of them (the original starts it at once, under the prompts). The second player's prompts are his own. */
 static int ev_music_want, ev_vp_n, ev_vp_hold, ev_vp_done, ev_music_done, ev_vp_started;
 static u32 ev_vp_t0, ev_vp_t1, ev_vp_tlast, ev_vp_lastmove;
+static int ev_vp_stick0;
 static int ev_mode_cur, ev_fresh;
 static u32 ev_fade_prev;
 static int ev_fire_armed = 1;
 #define VP_TIMES 2
-static int vp_press(Plat *P, int moving);
+static int vp_press(Plat *P, int jx, int jy);
 u32 rt_jsl(u32 target)
 {
     Plat *P = gP;
     if (P == (Plat *)1) return 0;
     switch (target) {
-    case 0x078003: sfx_play(P, (int)(cpu.a & 0xFF)); break;
+    case 0x078003: {
+        int id = (int)(cpu.a & 0xFF);
+        /* the joust plays an effect only for a knock-off: the hit ($0E, queued by the code that counts the slam) and what follows it ($0A five passes later, $0B and $0C as the
+           knocked skater goes down); $0D, queued by the routine at $196C every second or two whatever happens, stays silent */
+        if (ev_mode_cur == 5 && id != 0x0E && id != 0x0A && id != 0x0B && id != 0x0C) break;
+        sfx_play(P, id);
+        break;
+    }
     case 0x078006: if (ev_vp_n) ev_music_want = 1; else if (ev_song) raw_music_start(P, ev_song, ev_song_size, 48); break;           /* the original starts the song before its "press your button" prompts; here it starts when the stage does (vp_tick) */
     case 0x078009: ev_music_want = 0; music_stop(); break;
     }
@@ -304,10 +312,16 @@ static void inter_esc(void)                         /* ESC in a text screen: lea
    press of player 1's button is on (3 passes long). The first press comes 0.3 s after the first pass; the second (jam: after "press your button" comes the control) 1.0 s after the
    first pass that follows the first press, when its prompt is up. A press waits until the controller has rested for 0.35 s: a player who nudges it to choose the goofy foot (or the
    entry position in the ramp) gets his choice, and the press confirms it when he lets go. The song starts 0.5 s after the last press. */
-static int vp_press(Plat *P, int moving)
+static int vp_press(Plat *P, int jx, int jy)
 {
     u32 t, idle = (u32)(ev_vbl * 35 / 100);
+    int st = (jx + 1) * 3 + (jy + 1), moving;
     if (!ev_vp_n) return 0;
+    /* only a change of the controller is a nudge: a direction held since before the event (the stick that walked the skater into the exit), or one held steadily, does not
+       keep the press back (it used to, and the control prompt then needed a second press from the player) */
+    if (!ev_vp_started) ev_vp_stick0 = st;
+    moving = st != ev_vp_stick0;
+    ev_vp_stick0 = st;
     if (moving) ev_vp_lastmove = g_vbl;
     if (!ev_vp_started) {
         if (ev_mode_cur == 5) {                                          /* the joust's opponent choice (portraits, in the passes of the game) is the player's: wait for the pool, whose top rows hold only HUD text */
@@ -512,7 +526,7 @@ int rt_pass(u32 pc)
         io.pdl_len[0] = jx < 0 ? 0 : jx > 0 ? 96 : 50;
         io.pdl_len[1] = jy < 0 ? 0 : jy > 0 ? 96 : 50;
         if (!fire) ev_fire_armed = 1; else if (!ev_fire_armed) fire = 0;      /* the press that left the "SKATING TO" screen may still be down when the event comes up (fast loading): it is not an answer to the event's first prompt */
-        if (vp_press(P, jx || jy)) fire = 1;
+        if (vp_press(P, jx, jy)) fire = 1;
         io.btn[0] = fire ? 0x80 : 0;
         io.anykey = 0;
         if (P->evh != P->evt) {
