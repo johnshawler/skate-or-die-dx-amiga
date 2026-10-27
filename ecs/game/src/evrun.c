@@ -165,6 +165,8 @@ static void ev_load_pak(const u8 *p)
 static int ev_music_want, ev_vp_n, ev_vp_hold, ev_vp_done, ev_music_done, ev_vp_started;
 static u32 ev_vp_t0, ev_vp_t1, ev_vp_tlast, ev_vp_lastmove;
 static int ev_mode_cur, ev_fresh;
+static u32 ev_fade_prev;
+static int ev_fire_armed = 1;
 #define VP_TIMES 2
 static int vp_press(Plat *P, int moving);
 u32 rt_jsl(u32 target)
@@ -189,7 +191,19 @@ void rt_fade_wait(void)
     if (P == (Plat *)1) return;
     if (txt_on || ev_fresh) { ev_fresh = 0; inter_text_leave(P); }
     for (i = 0; i < 16; i++) pal[i] = LE16(BE1 + 0x9E00 + 2 * i);
-    set_palette(P, pal);
+    {   /* The original draws the next picture into E1 before it fades it in, but the picture on the display only follows E1 at the next pass of the game: the fade-in would
+           light up the old one (the opponent portraits, the controls screen). On the steps that brighten the palette the display is brought up to date first. */
+        u32 sum = 0;
+        for (i = 0; i < 16; i++) sum += ((pal[i] >> 8) & 15) + ((pal[i] >> 4) & 15) + (pal[i] & 15);
+        if (sum > ev_fade_prev) {
+            P->comp = P->shown ^ 1;
+            c2p_collect();
+            c2p_convert(ev_lut, BE1 + 0x2000, P->B[P->comp], P->comp);
+            set_palette(P, pal);
+            present(P);
+        } else set_palette(P, pal);
+        ev_fade_prev = sum;
+    }
     n = (ev_vbl * 79 + 500) / 1000;
     for (i = 0; i < n; i++) frame_wait(P);
 }
@@ -497,6 +511,7 @@ int rt_pass(u32 pc)
            more "right/down". Short timers (the oracle runs used 0/60/300) save a few thousand instructions a pass; the decisions are the same. */
         io.pdl_len[0] = jx < 0 ? 0 : jx > 0 ? 96 : 50;
         io.pdl_len[1] = jy < 0 ? 0 : jy > 0 ? 96 : 50;
+        if (!fire) ev_fire_armed = 1; else if (!ev_fire_armed) fire = 0;      /* the press that left the "SKATING TO" screen may still be down when the event comes up (fast loading): it is not an answer to the event's first prompt */
         if (vp_press(P, jx || jy)) fire = 1;
         io.btn[0] = fire ? 0x80 : 0;
         io.anykey = 0;
@@ -520,6 +535,12 @@ int rt_pass(u32 pc)
 static void ev_prepare(Plat *P, int mode, u32 vbl_hz)
 {
     int i;
+    ev_fade_prev = 0xFFFF;
+#ifdef BENCH_LOOP
+    ev_fire_armed = 1;
+#else
+    ev_fire_armed = 0;
+#endif
     ev_fresh = 1;                                                    /* the "SKATING TO" screen is still up: it goes when the event first shows something (rt_fade_wait, rt_pass), not under its fade-in */
     ev_mode_cur = mode;
     cpu.a = cpu.x = cpu.y = 0; cpu.s = 0x1FF; cpu.d = 0; cpu.db = 0; cpu.n = cpu.v = cpu.z = cpu.c = cpu.i = 0;
