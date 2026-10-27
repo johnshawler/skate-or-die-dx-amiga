@@ -162,7 +162,8 @@ static void ev_load_pak(const u8 *p)
 /* The event's start-up: one press of the button at the "SKATING TO ..." screen is all a player gives. The prompts at the start of an event (the original asks for the button
    once, the jam and the joust twice: "press your button", then the control or the opponent) are answered for player 1 with virtual presses at fixed times after the event starts,
    and the song starts a moment after the last of them (the original starts it at once, under the prompts). The second player's prompts are his own. */
-static int ev_music_want, ev_vp_n, ev_vp_hold, ev_vp_done, ev_music_done, ev_vp_started;
+static int ev_music_want, ev_vp_n, ev_vp_hold, ev_vp_done, ev_music_done, ev_vp_started, ev_gate, ev_user_need, ev_user_n, ev_fire_prev;
+static u32 ev_user_t;
 static u32 ev_vp_t0, ev_vp_t1, ev_vp_tlast, ev_vp_lastmove;
 static int ev_vp_stick0;
 static int ev_mode_cur, ev_fresh;
@@ -183,7 +184,7 @@ u32 rt_jsl(u32 target)
         sfx_play(P, id);
         break;
     }
-    case 0x078006: if (ev_vp_n) ev_music_want = 1; else if (ev_song) raw_music_start(P, ev_song, ev_song_size, 48); break;           /* the original starts the song before its "press your button" prompts; here it starts when the stage does (vp_tick) */
+    case 0x078006: if (ev_gate) ev_music_want = 1; else if (ev_song) raw_music_start(P, ev_song, ev_song_size, 48); break;           /* the original starts the song before its "press your button" prompts; here it starts when the stage does (vp_tick) */
     case 0x078009: ev_music_want = 0; music_stop(); break;
     }
     return 0;
@@ -343,11 +344,17 @@ static int vp_press(Plat *P, int jx, int jy)
         if (g_vbl - ev_vp_t1 >= (u32)ev_vbl && g_vbl - ev_vp_lastmove >= idle) { ev_vp_done |= 2; ev_vp_hold = 2; ev_vp_tlast = g_vbl; return 1; }
         return 0;
     }
-    if (ev_music_want && !ev_music_done && g_vbl - ev_vp_tlast >= (u32)(ev_vbl / 2)) {
-        ev_music_done = 1;
-        if (ev_song) raw_music_start(P, ev_song, ev_song_size, 48);
-    }
     return 0;
+}
+/* The song starts when the stage does: half a second after the last answer to the event's prompts. For the ramp, the high jump and the joust that is the automatic press;
+   in the downhill and the jam the foot (control) prompt is the player's own press, so it is his press (made after the automatic one, in the jam). */
+static void ev_music_tick(Plat *P)
+{
+    if (!ev_music_want || ev_music_done) return;
+    if (ev_user_need) { if (ev_user_n < ev_user_need || g_vbl - ev_user_t < (u32)(ev_vbl / 2)) return; }
+    else if (ev_vp_done != (1 << ev_vp_n) - 1 || g_vbl - ev_vp_tlast < (u32)(ev_vbl / 2)) return;
+    ev_music_done = 1;
+    if (ev_song) raw_music_start(P, ev_song, ev_song_size, 48);
 }
 /* a key poll of INTER's text screens: one frame per poll */
 static void inter_text_poll(Plat *P)
@@ -526,7 +533,10 @@ int rt_pass(u32 pc)
         io.pdl_len[0] = jx < 0 ? 0 : jx > 0 ? 96 : 50;
         io.pdl_len[1] = jy < 0 ? 0 : jy > 0 ? 96 : 50;
         if (!fire) ev_fire_armed = 1; else if (!ev_fire_armed) fire = 0;      /* the press that left the "SKATING TO" screen may still be down when the event comes up (fast loading): it is not an answer to the event's first prompt */
+        if (fire && !ev_fire_prev && (ev_vp_n == 0 || (ev_vp_done & 1))) { ev_user_n++; ev_user_t = g_vbl; }     /* the player's own presses (not the automatic one) */
+        ev_fire_prev = fire;
         if (vp_press(P, jx, jy)) fire = 1;
+        ev_music_tick(P);
         io.btn[0] = fire ? 0x80 : 0;
         io.anykey = 0;
         if (P->evh != P->evt) {
@@ -566,10 +576,12 @@ static void ev_prepare(Plat *P, int mode, u32 vbl_hz)
     ev_period = (vbl_hz << 16) / (u32)ev_hz; ev_last_tod = *(volatile u8 *)0xBFE801UL; ev_now = 0; ev_due = 0;
     P->evh = P->evt;
 #ifdef BENCH_LOOP
-    ev_vp_n = 0;                                                     /* the timing builds bring their own input */
+    ev_vp_n = 0; ev_gate = 0;                                        /* the timing builds bring their own input and start the song at once */
 #else
-    ev_vp_n = mode == 4 ? 2 : 1;                                     /* the jam asks for the button twice (press your button, then the control) */
+    ev_vp_n = mode == 3 ? 0 : 1;                                     /* the downhill's first prompt is the foot: the player's own press; the jam's "press your button" is answered, its foot is his */
+    ev_gate = 1;
 #endif
+    ev_user_need = (mode == 3 || mode == 4) ? 1 : 0; ev_user_n = 0; ev_fire_prev = 0; ev_user_t = 0;
     ev_vp_started = 0; ev_vp_t1 = 0; ev_vp_hold = 0; ev_vp_done = 0; ev_music_want = 0; ev_music_done = 0;
 }
 

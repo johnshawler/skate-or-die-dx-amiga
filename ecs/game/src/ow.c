@@ -212,8 +212,8 @@ static const char *const sk_race[] = {
     " CLICK AND FORWARD     JUMP",
     " CLICK AND BACK        DUCK",
     " CLICK AND LEFT/RIGHT  SLIDE TURN", "",
-    "NUDGE THE CONTROLLER AT THE START TO",
-    "CHANGE STYLE; LET GO AND IT BEGINS.", 0};
+    "NUDGE THE CONTROLLER TO CHANGE STYLE,",
+    "THEN PRESS FIRE AGAIN TO BEGIN.", 0};
 static const char *const sk_jam[] = {
     "DOWNHILL JAM",
     "",
@@ -232,8 +232,8 @@ static const char *const sk_jam[] = {
     "SIDE.",
     "",
     "PLAYER 2: KEYPAD 1-9, SHIFT = BUTTON",
-    "NUDGE THE CONTROLLER AT THE START TO",
-    "CHANGE STYLE; LET GO AND IT BEGINS.", 0};
+    "NUDGE THE CONTROLLER TO CHANGE STYLE,",
+    "THEN PRESS FIRE AGAIN TO BEGIN.", 0};
 static const char *const sk_joust[] = {
     "POOL JOUST",
     "",
@@ -306,7 +306,12 @@ static int sk_wait_fire(Plat *P)
     for (;;) {
         int fire;
         frame_wait(P); poll_keyboard(P);
-        if (P->keys[0x45]) return 0;
+        if (P->keys[0x45]) {                                         /* ESC: back to the shop; the key must be up before the shop's own loop looks (it would quit on it) */
+            int w;
+            for (w = 0; w < 200 && P->keys[0x45]; w++) { frame_wait(P); poll_keyboard(P); }
+            P->keys[0x45] = 0;
+            return 0;
+        }
         fire = !(CIAA_PRA & 0x80) || !(CIAA_PRA & 0x40) || P->keys[0x40] || P->keys[0x44] || P->keys[0x60] || P->keys[0x61];
         if (!fire) armed = 1; else if (armed) { P->evh = P->evt; return 1; }
     }
