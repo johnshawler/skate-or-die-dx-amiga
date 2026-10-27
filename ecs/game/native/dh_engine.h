@@ -182,7 +182,16 @@ static int nat_step_pos(void)
 {
     u16 x = cpu.x;
     if ((u32)0x6464 + x > 0xFFFD || (u32)0x60FA + x > 0xFFFD) return 0;
+#ifdef N_STEP_PCT
+    {   /* N_STEP_K * N_STEP_PCT / 100 rows on average: the remainder carries over (per skater), so 1.6 rows is 1, 2, 1, 2, 2, ... */
+        static u16 acc[2];
+        u16 a = (u16)(acc[(x >> 1) & 1] + N_STEP_K * N_STEP_PCT), n = (u16)(a / 100);
+        acc[(x >> 1) & 1] = (u16)(a % 100);
+        ST16(B3 + 0x6464 + x, (u16)(LE16(B3 + 0x6464 + x) + n));
+    }
+#else
     ST16(B3 + 0x6464 + x, (u16)(LE16(B3 + 0x6464 + x) + N_STEP_K));
+#endif
     ST16(B3 + 0x60FA + x, 0);
     cpu.a = 0; cpu.n = 0; cpu.z = 1;
     return 1;
@@ -198,15 +207,7 @@ static int nat_camera(void)
     u16 A, target = G3(0x646C), cam = G3(0x6538), p0 = G3(0x6464), p1 = G3(0x6466), lead = p0 > p1 ? p0 : p1, diff, step;
     u8 N = 0, V = 0, Z = 0, C = 0;
 #ifdef N_CAM_LEAD
-#ifdef N_CAM_RIGID
-    {   /* the camera follows the leader (the middle between the skaters is ignored): at 7/8 of his speed until he is N_CAM_LEAD rows from the top, then at his speed, so he cannot run ahead of the scroll */
-        u16 off = lead >> N_CAM_SHIFT;
-        if (off > N_CAM_LEAD) off = N_CAM_LEAD;
-        target = (u16)(lead - off);
-    }
-#else
     if (lead >= N_CAM_LEAD && (u16)(lead - N_CAM_LEAD) > target) target = (u16)(lead - N_CAM_LEAD);      /* the leader stays within N_CAM_LEAD rows of the camera, not just of the middle */
-#endif
 #endif
     diff = (u16)(target - cam);
     step = (diff & 0x8000) ? 0 : diff <= N_CAM_CAP ? diff : N_CAM_CAP;

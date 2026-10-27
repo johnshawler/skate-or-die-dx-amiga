@@ -99,14 +99,14 @@ def run(cfgname, mode, passes, trace=False, script=None):
     snapshot = {b: bytes(C.mem[b << 16:(b << 16) + 65536]) for b in BANKS}
     cap = int(os.environ.get("T816_CAP", 4_000_000))
     otr = np.zeros((cap, 4), dtype=np.uint32) if trace else None
-    step_k = 0; cam_cap = 0; cam_lead = 0; cam_rigid = False; cam_shift = 3
+    step_k = 0; cam_cap = 0; cam_lead = 0; step_pct = 0; step_acc = {0: 0, 2: 0}
     if cfgname == 'ev21':            # the jam's position step (native/dh21_consts.h N_STEP_K) is a deliberate change: the oracle gets the same one at $25B9
         import re
         consts = open(f'{G}/native/dh21_consts.h').read()
         m = re.search(r'#define N_STEP_K (\d+)', consts); step_k = int(m.group(1)) if m else 0
+        m = re.search(r'#define N_STEP_PCT (\d+)', consts); step_pct = int(m.group(1)) if m else 0
         m = re.search(r'#define N_CAM_CAP (\d+)', consts); cam_cap = int(m.group(1)) if m else 0
         m = re.search(r'#define N_CAM_LEAD (\d+)', consts); cam_lead = int(m.group(1)) if m else 0
-        cam_rigid = bool(re.search(r'#define N_CAM_RIGID', consts)); m = re.search(r'#define N_CAM_SHIFT (\d+)', consts); cam_shift = int(m.group(1)) if m else 3
     [C.hook(h) for h in hooks]; C.hook(0x077E08)
     if step_k: C.hook(0x0325B9)
     if cam_cap: C.hook(0x0326F6)
@@ -125,8 +125,7 @@ def run(cfgname, mode, passes, trace=False, script=None):
         if r == 0: print('oracle: instruction limit'); break
         if cam_cap and C.hit_pc() == 0x0326F6:    # the camera's step with the larger cap, then the RTS at $2719
             target = C.rd16(0x03646C); lead = max(C.rd16(0x036464), C.rd16(0x036466))
-            if cam_rigid: target = (lead - min(lead >> cam_shift, cam_lead)) & 0xFFFF
-            elif cam_lead and lead >= cam_lead and ((lead - cam_lead) & 0xFFFF) > target: target = (lead - cam_lead) & 0xFFFF
+            if cam_lead and lead >= cam_lead and ((lead - cam_lead) & 0xFFFF) > target: target = (lead - cam_lead) & 0xFFFF
             diff = (target - C.rd16(0x036538)) & 0xFFFF
             step = 0 if diff & 0x8000 else min(diff, cam_cap)
             cam = (C.rd16(0x036538) + step) & 0xFFFF
@@ -134,7 +133,11 @@ def run(cfgname, mode, passes, trace=False, script=None):
             C.cpu.p = (C.cpu.p & ~(0x80 | 0x40 | 0x02 | 0x01)) | (0x80 if cam & 0x8000 else 0) | (0x02 if cam == 0 else 0)
             continue
         if step_k and C.hit_pc() == 0x0325B9:     # INC $6464,X; LDA #0; STA $60FA,X; RTS with the position moving step_k rows
-            x = C.cpu.x; C.wr16(0x036464 + x, (C.rd16(0x036464 + x) + step_k) & 0xFFFF); C.wr16(0x0360FA + x, 0)
+            x = C.cpu.x
+            if step_pct:                          # the same carry of the fraction as nat_step_pos
+                a = step_acc[x & 2] + step_k * step_pct; n = a // 100; step_acc[x & 2] = a % 100
+            else: n = step_k
+            C.wr16(0x036464 + x, (C.rd16(0x036464 + x) + n) & 0xFFFF); C.wr16(0x0360FA + x, 0)
             sp = C.cpu.s; ret = C.mem[(sp + 1) & 0xFFFF] | (C.mem[(sp + 2) & 0xFFFF] << 8)
             C.cpu.s = (sp + 2) & 0xFFFF; C.cpu.pc = (ret + 1) & 0xFFFF; C.cpu.a = 0; C.cpu.p = (C.cpu.p & ~0x80) | 0x02
             continue
@@ -255,7 +258,6 @@ def run(cfgname, mode, passes, trace=False, script=None):
     if probe:
         import numpy as _np
         pr = _np.array(probe, dtype=_np.int64); d = _np.diff(pr, axis=0)
-        if os.environ.get('T816_PROBEOUT'): _np.savetxt(os.environ['T816_PROBEOUT'], pr, fmt='%d')
         okd = (d[:, 0] >= 0) & (d[:, 0] < 40); okd2 = (d[:, 1] >= 0) & (d[:, 1] < 40); okc = (d[:, 2] >= 0) & (d[:, 2] < 40)
         print('jam probe: max skater0 step %d, skater1 step %d, camera step %d per pass; max (leader - camera) %d, max (camera - trailer) %d; camera target - camera: max %d' % (d[okd, 0].max(), d[okd2, 1].max(), d[okc, 2].max(), (_np.maximum(pr[:, 0], pr[:, 1]) - pr[:, 2]).max(), (pr[:, 2] - _np.minimum(pr[:, 0], pr[:, 1])).max(), (pr[:, 3] - pr[:, 2]).max()))
     print('RESULT:', 'identical' if ok else 'DIFFERENT')
