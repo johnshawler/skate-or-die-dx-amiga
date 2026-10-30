@@ -391,7 +391,8 @@ static void after_event(Plat *P, Menu *M)
     if (M->f70) {
         os_give();
         file_save("highs.bin", M->scores, 192);
-        os_take(P);
+        os_take(P);                                             /* (taking the machine back switches the audio off: the shop's song starts again) */
+        ow_music_start(P);
     }
     if (M->compete_all) { M->compete_all = 0; menu_congrats(M); }
 }
