@@ -168,8 +168,7 @@ static u32 ev_vp_t0, ev_vp_t1, ev_vp_tlast, ev_vp_lastmove;
 static int ev_vp_stick0;
 static int ev_mode_cur, ev_fresh;
 static u32 ev_fade_prev;
-static int ev_fire_armed = 1, ev_fire_rel;
-static u32 ev_fire_rel_t;
+static int ev_fire_armed = 1;
 #define VP_TIMES 2
 static int vp_press(Plat *P, int jx, int jy);
 u32 rt_jsl(u32 target)
@@ -533,14 +532,7 @@ int rt_pass(u32 pc)
            more "right/down". Short timers (the oracle runs used 0/60/300) save a few thousand instructions a pass; the decisions are the same. */
         io.pdl_len[0] = jx < 0 ? 0 : jx > 0 ? 96 : 50;
         io.pdl_len[1] = jy < 0 ? 0 : jy > 0 ? 96 : 50;
-        /* The press that left the "SKATING TO" screen must not reach the event's first prompt, however it arrives: held through the loading, repeating (a key's repeat, a joystick's
-           autofire), bouncing. The button counts again only after it has been up for 0.4 s, and the keyboard's queue is thrown away until then. */
-        if (fire) { ev_fire_rel = 0; if (!ev_fire_armed) fire = 0; }
-        else {
-            if (!ev_fire_rel) { ev_fire_rel = 1; ev_fire_rel_t = g_vbl; }
-            if (!ev_fire_armed && g_vbl - ev_fire_rel_t >= (u32)(ev_vbl * 4 / 10)) ev_fire_armed = 1;
-        }
-        if (!ev_fire_armed) P->evh = P->evt;
+        if (!fire) ev_fire_armed = 1; else if (!ev_fire_armed) fire = 0;      /* the press that left the "SKATING TO" screen may still be down when the event comes up (fast loading): it is not an answer to the event's first prompt */
         if (fire && !ev_fire_prev && (ev_vp_n == 0 || (ev_vp_done & 1))) { ev_user_n++; ev_user_t = g_vbl; }     /* the player's own presses (not the automatic one) */
         ev_fire_prev = fire;
         if (vp_press(P, jx, jy)) fire = 1;
@@ -571,7 +563,7 @@ static void ev_prepare(Plat *P, int mode, u32 vbl_hz)
 #ifdef BENCH_LOOP
     ev_fire_armed = 1;
 #else
-    ev_fire_armed = 0; ev_fire_rel = 0;
+    ev_fire_armed = 0;
 #endif
     ev_fresh = 1;                                                    /* the "SKATING TO" screen is still up: it goes when the event first shows something (rt_fade_wait, rt_pass), not under its fade-in */
     ev_mode_cur = mode;
