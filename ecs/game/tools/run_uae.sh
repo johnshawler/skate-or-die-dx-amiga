@@ -24,7 +24,7 @@ $CPUOPT
 CFG
 xdpyinfo -display :98 >/dev/null 2>&1 || (Xvfb :98 -screen 0 1024x768x24 >/dev/null 2>&1 9>&- &) ; sleep 1
 mkdir -p /tmp/xdg_bench; chmod 700 /tmp/xdg_bench
-if [ -n "$AUDIO" ]; then export XDG_RUNTIME_DIR=/tmp/claude-0/pa-run PULSE_SINK=cap SDL_AUDIODRIVER=pulseaudio DISPLAY=:98 LIBGL_ALWAYS_SOFTWARE=1 MESA_GL_VERSION_OVERRIDE=3.3 MESA_GLSL_VERSION_OVERRIDE=330   # the emulated Paula's output goes to a null sink that rec: steps record
+if [ -n "$AUDIO" ]; then export XDG_RUNTIME_DIR=/tmp/pa-run PULSE_SINK=cap SDL_AUDIODRIVER=pulseaudio DISPLAY=:98 LIBGL_ALWAYS_SOFTWARE=1 MESA_GL_VERSION_OVERRIDE=3.3 MESA_GLSL_VERSION_OVERRIDE=330   # the emulated Paula's output goes to a null sink that rec: steps record
 else export XDG_RUNTIME_DIR=/tmp/xdg_bench DISPLAY=:98 SDL_AUDIODRIVER=dummy; fi
 export LIBGL_ALWAYS_SOFTWARE=1 MESA_GL_VERSION_OVERRIDE=3.3 MESA_GLSL_VERSION_OVERRIDE=330
 (fs-uae $T/t.fs-uae >$OUT/fsuae.log 2>&1 9>&- &)

@@ -3,7 +3,7 @@
 # usage: uae_boot_test.sh <exe> <out.png> <kickstart.rom> [wait_seconds]
 set -e
 EXE=$(readlink -f "$1"); OUT=$(readlink -f "$2"); ROM=$(readlink -f "$3"); WAIT=${4:-30}
-T=$(mktemp -d /tmp/claude-0/-home-user/16859150-f4a5-5599-9aa3-5cfc20e9489a/scratchpad/uaeXXXXXX)
+T=$(mktemp -d /tmp/uaeXXXXXX)
 printf 'SYS:OverworldDemo\n' > $T/ss
 rdbtool -f $T/t.hdf create size=4Mi + init + add size=100% name=SOD dostype=DOS1 bootable=1 pri=0 >/dev/null
 xdftool $T/t.hdf open part=SOD + format SOD ffs + makedir S + makedir C + makedir L + makedir Libs + makedir Devs + write $EXE OverworldDemo + write $T/ss S/Startup-Sequence >/dev/null

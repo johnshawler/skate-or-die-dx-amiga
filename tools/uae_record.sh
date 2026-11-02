@@ -3,7 +3,7 @@
 # usage: uae_record.sh <exe> <outdir> <rom> <eventkey F1|F2> ; env BOOT_WAIT, SEQ (xdotool commands after the event starts)
 set -e
 EXE=$(readlink -f "$1"); OUT=$(readlink -f "$2"); ROM=$(readlink -f "$3"); mkdir -p $OUT
-T=$(mktemp -d /tmp/claude-0/-home-user/16859150-f4a5-5599-9aa3-5cfc20e9489a/scratchpad/uaeXXXXXX)
+T=$(mktemp -d /tmp/uaeXXXXXX)
 printf 'SYS:OverworldDemo\n' > $T/ss
 rdbtool -f $T/t.hdf create size=8Mi + init + add size=100% name=SOD dostype=DOS1 bootable=1 pri=0 >/dev/null
 xdftool $T/t.hdf open part=SOD + format SOD ffs + makedir S + makedir C + makedir L + makedir Libs + makedir Devs + write $EXE OverworldDemo + write $T/ss S/Startup-Sequence >/dev/null
@@ -20,7 +20,7 @@ window_width = 720
 window_height = 540
 CFG
 pgrep Xvfb >/dev/null || (Xvfb :99 -screen 0 1024x768x24 >/dev/null 2>&1 &) ; sleep 1
-export XDG_RUNTIME_DIR=/tmp/claude-0/pa-run PULSE_SINK=cap
+export XDG_RUNTIME_DIR=/tmp/pa-run PULSE_SINK=cap
 export DISPLAY=:99 SDL_AUDIODRIVER=pulseaudio LIBGL_ALWAYS_SOFTWARE=1 MESA_GL_VERSION_OVERRIDE=3.3 MESA_GLSL_VERSION_OVERRIDE=330
 if [ -n "$AUDIO_FROM_START" ]; then (timeout ${AUDIO_FROM_START} parec -d cap.monitor --file-format=wav $OUT/audio_boot.wav >/dev/null 2>&1 &); fi
 (fs-uae $T/t.fs-uae >$T/out.txt 2>&1 &)

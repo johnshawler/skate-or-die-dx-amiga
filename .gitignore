@@ -1,8 +1,13 @@
-# rebuilt by demo/build.sh and the tools
-demo/build/
-demo/screenshots/
+dist/
+dist_whd/
+build/
+build_whd/
+work/
+demo/
+roms/
 *.hdf
+*.adf
+*.rom
+*.so
 __pycache__/
 *.pyc
-# 60 MB of NES audio renders; the event/title audio the demo uses is in demo/assets
-work/nes_audio/
